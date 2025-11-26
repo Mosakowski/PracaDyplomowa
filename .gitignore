@@ -1,0 +1,41 @@
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+.idea
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+node_modules/
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Gradle / Build
+.gradle/
+build/
+*/build/
+*/*/build/
+
+# Kotlin / Java
+out/
+
+# Local configuration
+local.properties
+
+# System
+.DS_Store
+Thumbs.db
+
+# Docker volumes (żebyś nie wysłał całej bazy danych do internetu!)
+db_data/
+postgres_data/

@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  # Serwis Bazy Danych PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: sport_booking_db
+    restart: always
+    environment:
+      - POSTGRES_USER=admin          # Login do bazy
+      - POSTGRES_PASSWORD=admin      # Hasło do bazy
+      - POSTGRES_DB=sport_booking    # Nazwa Twojej bazy
+    ports:
+      - "5432:5432"                  # Udostępnienie portu na zewnątrz
+    volumes:
+      - db_data:/var/lib/postgresql/data # Zapisywanie danych na Twoim dysku
+
+  # Narzędzie do podglądu bazy (żebyś widział co się dzieje)
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+
+volumes:
+  db_data:
