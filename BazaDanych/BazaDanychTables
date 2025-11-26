@@ -1,0 +1,63 @@
+Table User {
+  user_id INT [primary key]
+  name VARCHAR
+  email VARCHAR UNIQUE
+  password VARCHAR
+  user_type ENUM("admin", "client", "field_owner")
+  created_at TIMESTAMP
+}
+
+
+Table Facility {
+  facility_id INT [primary key]
+  user_id INT [ref: > User.user_id]
+  name VARCHAR
+  location VARCHAR
+  description TEXT
+  created_at TIMESTAMP
+}
+
+
+Table Field {
+  field_id integer [primary key]
+  facility_id INT [ref: > Facility.facility_id]
+  name VARCHAR
+  created_at TIMESTAMP
+  field_type ENUM("football", "volleyball", "other")
+  active BOOLEAN
+  hours JSONB
+  exceptions JSONB
+  slot_lenght_minutes INT
+  price_per_slot NUMERIC
+  cancel_deadline INT
+}
+
+
+Table Booking {
+  booking_id INT [primary key]
+  field_id INT [ref: > Field.field_id]
+  user_id INT [ref: > User.user_id]
+  start TIMESTAMP
+  end TIMESTAMP
+  status ENUM("active", "cancelled", "waiting", "completed")
+  created_at TIMESTAMP
+}
+
+
+Table Payment {
+  payment_id INT [primary key]
+  booking_id INT [ref: > Booking.booking_id]
+  amount NUMERIC
+  payment_date TIMESTAMP
+  transaction_id INT
+  payment_method VARCHAR
+}
+
+
+Table Cancellation {
+  cancellation_id INT [primary key]
+  booking_id INT [ref: > Booking.booking_id]
+  status BOOLEAN
+  refund_amount NUMERIC
+}
+
