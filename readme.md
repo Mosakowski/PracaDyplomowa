@@ -2,6 +2,7 @@
 
 Multiplatformowa aplikacja do zarządzania i rezerwowania boisk sportowych. Projekt został zbudowany w Kotlin Multiplatform, dzięki czemu umożliwia współdzielenie logiki między Androidem, iOS, Webem oraz serwerem backendowym.
 
+Jakub Mosakowski 166296
 ---
 
 ## 🎯 Funkcje
