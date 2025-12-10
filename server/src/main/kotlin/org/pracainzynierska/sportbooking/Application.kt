@@ -42,6 +42,7 @@ fun Application.module() {
 
     routing {
         facilityRoutes()
+        authRoutes()
         get("/") {
             call.respondText("Ktor: ${Greeting().greet()}")
 

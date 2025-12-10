@@ -4,31 +4,43 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.http.* // Ważne: Do ContentType
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
-// Klasa odpowiedzialna za komunikację z serwerem
 class SportApi {
 
-    // 1. Tworzymy "wirtualną przeglądarkę" (HttpClient)
     private val client = HttpClient {
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true // Ignoruj pola, których nie znamy (bezpieczeństwo)
-            })
+            json(Json { ignoreUnknownKeys = true })
         }
     }
 
-    // 2. Adres Twojego serwera.
-    // UWAGA: Na Androidzie 'localhost' oznacza telefon, nie komputer.
-    // Do emulatora używa się 10.0.2.2, ale na Webie 'localhost' jest OK.
+    // Pamiętaj: localhost działa na Webie. Na Androidzie będziesz musiał to zmienić na 10.0.2.2!
     private val baseUrl = "http://localhost:8080/api"
 
-    // 3. Funkcja pobierająca listę obiektów
-    // 'suspend' oznacza, że funkcja nie zablokuje ekranu podczas czekania na odpowiedź
-    // Zwraca listę naszych DTO, które zdefiniowaliśmy wcześniej
+    // 1. Pobieranie boisk
     suspend fun getFacilities(): List<FacilityDto> {
-        // Wyślij zapytanie GET, pobierz odpowiedź (body) i zamień JSON na obiekty Kotlin
         return client.get("$baseUrl/facilities").body()
+    }
+
+    // 2. Rejestracja (NOWE)
+    // Funkcja przyjmuje obiekt RegisterRequest (ten z Models.kt)
+    // Zwraca true, jeśli się udało, lub rzuca błędem
+    suspend fun register(request: RegisterRequest): Boolean {
+        val response = client.post("$baseUrl/auth/register") {
+            contentType(ContentType.Application.Json) // Mówimy serwerowi: "Wysyłam JSON"
+            setBody(request) // Pakujemy dane do koperty
+        }
+        return response.status == HttpStatusCode.Created
+    }
+
+    // 3. Logowanie (NOWE)
+    // Zwraca AuthResponse (token + dane usera)
+    suspend fun login(request: LoginRequest): AuthResponse {
+        return client.post("$baseUrl/auth/login") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
     }
 }

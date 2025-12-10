@@ -34,4 +34,5 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:0.53.0")
     implementation("org.jetbrains.exposed:exposed-dao:0.53.0") // opcjonalnie, dla podejścia obiektowego
     implementation("org.jetbrains.exposed:exposed-json:0.53.0") // obsługa JSONB dla grafiku
+    implementation("org.mindrot:jbcrypt:0.4") //bcrypt, algorytm, który zamienia hasło w ciąg znaków niemożliwy do odwrócenia.
 }

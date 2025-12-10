@@ -1,103 +1,212 @@
 package org.pracainzynierska.sportbooking
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.* // Używamy Material 3
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.*
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.ui.tooling.preview.Preview
+
+// Importy Twoich modeli z modułu Shared
 import org.pracainzynierska.sportbooking.FacilityDto
 import org.pracainzynierska.sportbooking.SportApi
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card // Zmieniono na material3
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.unit.dp
+import org.pracainzynierska.sportbooking.RegisterRequest
+import org.pracainzynierska.sportbooking.LoginRequest
+import org.pracainzynierska.sportbooking.AuthResponse
 
-import sportsfieldbooking.composeapp.generated.resources.Res
-import sportsfieldbooking.composeapp.generated.resources.compose_multiplatform
+// Enum do prostej nawigacji: albo Logowanie, albo Lista
+enum class Screen {
+    LOGIN, LIST
+}
 
 @Composable
 @Preview
 fun App() {
     MaterialTheme {
-        // 1. Stan: Tutaj przechowujemy listę boisk. Na początku jest pusta.
-        var facilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
+        // 1. Stan aplikacji: Na którym jesteśmy ekranie? Domyślnie LOGOWANIE.
+        var currentScreen by remember { mutableStateOf(Screen.LOGIN) }
 
-        // 2. Klient API (ten z Shared)
+        // Stan zalogowanego użytkownika (żeby wyświetlić "Witaj X")
+        var currentUser by remember { mutableStateOf<AuthResponse?>(null) }
+
+        // Klient API (wspólny dla wszystkich ekranów)
         val api = remember { SportApi() }
 
-        // 3. Efekt uboczny (LaunchedEffect): Wykonaj to TYLKO RAZ przy starcie
-        LaunchedEffect(Unit) {
-            try {
-                // Pobierz dane z backendu
-                facilities = api.getFacilities()
-            } catch (e: Exception) {
-                println("Błąd pobierania: ${e.message}")
+        // Główny kontener
+        Column(Modifier.fillMaxSize()) {
+
+            // Pasek górny (Header)
+            Row(
+                Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("SportBooking", style = MaterialTheme.typography.headlineSmall)
+                // Jeśli użytkownik jest zalogowany, pokaż powitanie
+                if (currentUser != null) {
+                    Text(
+                        "Witaj, ${currentUser?.name}!",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
-        }
 
-        // 4. Widok
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            // ZMIANA: Zamiast 'h4' używamy 'headlineMedium' (standard Material 3)
-            Text(
-                text = "Dostępne Obiekty Sportowe",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            // 5. Wyświetlanie listy
-            facilities.forEach { facility ->
-                // Tutaj wywołujemy funkcję zdefiniowaną na dole pliku
-                FacilityCard(facility)
+            // 2. Nawigacja: Wybierz widok na podstawie zmiennej 'currentScreen'
+            when (currentScreen) {
+                Screen.LOGIN -> {
+                    // Wyświetl ekran logowania
+                    LoginScreen(
+                        onLoginSuccess = { user ->
+                            currentUser = user      // Zapisz dane usera
+                            currentScreen = Screen.LIST // Przełącz na listę
+                        },
+                        api = api
+                    )
+                }
+                Screen.LIST -> {
+                    // Wyświetl listę boisk (Twój stary kod, zamknięty w funkcji)
+                    FacilitiesScreen(api)
+                }
             }
         }
     }
 }
 
+// --- KOMPONENT 1: EKRAN LOGOWANIA ---
+@Composable
+fun LoginScreen(onLoginSuccess: (AuthResponse) -> Unit, api: SportApi) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isRegisterMode by remember { mutableStateOf(false) } // Przełącznik: Logowanie czy Rejestracja?
+    val scope = rememberCoroutineScope() // Do obsługi asynchronicznego API
+
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            if (isRegisterMode) "Załóż nowe konto" else "Zaloguj się",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // Pola formularza
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Adres Email") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Hasło") },
+            visualTransformation = PasswordVisualTransformation(), // Kropki zamiast liter
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // Główny przycisk
+        Button(
+            onClick = {
+                scope.launch {
+                    try {
+                        errorMessage = null
+                        if (isRegisterMode) {
+                            // 1. Próba rejestracji
+                            val request = RegisterRequest(email, password, "Nowy Użytkownik")
+                            val success = api.register(request)
+                            if (success) {
+                                errorMessage = "Sukces! Możesz się teraz zalogować."
+                                isRegisterMode = false // Wróć do logowania
+                            }
+                        } else {
+                            // 2. Próba logowania
+                            val request = LoginRequest(email, password)
+                            val user = api.login(request)
+                            onLoginSuccess(user) // Wywołaj zmianę ekranu
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Błąd: ${e.message}"
+                        println("Auth error: $e")
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp)
+        ) {
+            Text(if (isRegisterMode) "Zarejestruj się" else "Zaloguj")
+        }
+
+        // Komunikat o błędzie (jeśli jest)
+        errorMessage?.let { msg ->
+            Spacer(Modifier.height(8.dp))
+            Text(msg, color = MaterialTheme.colorScheme.error)
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Przełącznik trybu (Text Button)
+        TextButton(onClick = {
+            isRegisterMode = !isRegisterMode
+            errorMessage = null
+        }) {
+            Text(if (isRegisterMode) "Masz już konto? Zaloguj się" else "Nie masz konta? Zarejestruj się")
+        }
+    }
+}
+
+// --- KOMPONENT 2: LISTA BOISK (To co miałeś wcześniej) ---
+@Composable
+fun FacilitiesScreen(api: SportApi) {
+    var facilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
+
+    // Pobierz dane przy wejściu na ten ekran
+    LaunchedEffect(Unit) {
+        try {
+            facilities = api.getFacilities()
+        } catch (e: Exception) {
+            println("Błąd pobierania listy: ${e.message}")
+        }
+    }
+
+    Column(Modifier.padding(16.dp)) {
+        Text("Dostępne obiekty", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(16.dp))
+
+        facilities.forEach { facility ->
+            FacilityCard(facility)
+        }
+    }
+}
+
+// --- KOMPONENT 3: KAFEL BOISKA ---
 @Composable
 fun FacilityCard(facility: FacilityDto) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        // W Material 3 cienie (elevation) ustawia się trochę inaczej:
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            // ZMIANA: Zamiast 'h6' używamy 'titleLarge'
-            Text(
-                text = facility.name,
-                style = MaterialTheme.typography.titleLarge
-            )
-
+            Text(text = facility.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Lokalizacja: ${facility.location}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary
             )
-
             facility.description?.let { desc ->
-                Text(
-                    text = desc,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                Spacer(Modifier.height(4.dp))
+                Text(text = desc, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
