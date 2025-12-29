@@ -17,7 +17,7 @@ object DatabaseFactory {
 
         // Magia Exposed: Automatycznie tworzy tabele, jeśli ich nie ma!
         transaction(database) {
-            SchemaUtils.create(Users, Facilities, Fields)
+            SchemaUtils.create(Users, Facilities, Fields, Bookings)
         }
     }
 

@@ -35,3 +35,23 @@ data class AuthResponse(
     val name: String,
     val role: String   // Np. "CLIENT" lub "FIELD_OWNER"
 )
+
+// ... (istniejące DTO)
+
+@Serializable
+data class BookingDto(
+    val id: Int,
+    val fieldId: Int,
+    val fieldName: String, // Przydatne do wyświetlania na liście "Moje rezerwacje"
+    val startTimestamp: Long, // Data w milisekundach
+    val endTimestamp: Long,
+    val status: String,
+    val price: Double
+)
+
+@Serializable
+data class CreateBookingRequest(
+    val fieldId: Int,
+    val startTimestamp: Long,
+    val endTimestamp: Long
+)

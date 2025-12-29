@@ -55,3 +55,29 @@ enum class TypeField{
     FOOTBALL, VOLLEYBALL, TENNIS, OTHER
 }
 
+// Enum statusu rezerwacji
+// : active, cancelled, waiting, completed
+enum class BookingStatus {
+    WAITING, ACTIVE, COMPLETED, CANCELLED
+}
+
+// Tabela Booking
+object Bookings : Table("bookings") {
+    val id = integer("booking_id").autoIncrement()
+
+    // Powiązania (Klucze obce)
+    val userId = integer("user_id").references(Users.id) // Kto rezerwuje?
+    val fieldId = integer("field_id").references(Fields.id) // Co rezerwuje?
+
+    // Czas rezerwacji (Timestamp)
+    val start = timestamp("start_time") // Zmieniam nazwę na start_time dla jasności w SQL
+    val end = timestamp("end_time")
+
+    // Status i cena
+    val status = enumerationByName("status", 20, BookingStatus::class).default(BookingStatus.WAITING)
+    val price = decimal("price", 10, 2) // Cena za tę konkretną rezerwację
+
+    val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+
+    override val primaryKey = PrimaryKey(id)
+}
