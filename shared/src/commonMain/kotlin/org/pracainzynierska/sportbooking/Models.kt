@@ -2,12 +2,14 @@ package org.pracainzynierska.sportbooking
 
 import kotlinx.serialization.Serializable
 
+// Zaktualizuj FacilityDto - dodaj pole 'fields'
 @Serializable
 data class FacilityDto(
     val id: Int,
     val name: String,
     val location: String,
-    val description: String?
+    val description: String?,
+    val fields: List<FieldDto> = emptyList() // 👈 Nowe pole: lista boisk wewnątrz obiektu
 )
 
 // 1. Co wysyła użytkownik, gdy chce się zarejestrować?
@@ -54,4 +56,11 @@ data class CreateBookingRequest(
     val fieldId: Int,
     val startTimestamp: Long,
     val endTimestamp: Long
+)
+// Dodaj nową klasę dla Boiska (widok uproszczony)
+@Serializable
+data class FieldDto(
+    val id: Int,
+    val name: String,
+    val type: String // np. "PIŁKA_NOŻNA"
 )

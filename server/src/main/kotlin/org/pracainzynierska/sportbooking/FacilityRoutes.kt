@@ -9,7 +9,7 @@ fun Route.facilityRoutes() {
 
     route("/api/facilities") {
         get{
-            val facilities = repo.getAllFacilities()
+            val facilities = repo.getAll()
             call.respond(facilities)
         }
     }

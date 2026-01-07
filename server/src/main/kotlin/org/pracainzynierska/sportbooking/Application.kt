@@ -10,6 +10,8 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.http.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
 
 fun main() {
     embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0", module = Application::module)
@@ -26,6 +28,7 @@ fun Application.module() {
         allowMethod(HttpMethod.Patch)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
+        allowHeader("X-User-Id")
 
         // Na produkcji tutaj wpiszesz konkretną domenę.
         // Na etapie dev pozwalamy na wszystko ("*"):
@@ -36,6 +39,7 @@ fun Application.module() {
         json(Json {
             prettyPrint = true
             isLenient = true
+            ignoreUnknownKeys = true
         }
         )
     }
@@ -43,6 +47,7 @@ fun Application.module() {
     routing {
         facilityRoutes()
         authRoutes()
+        bookingRoutes()
         get("/") {
             call.respondText("Ktor: ${Greeting().greet()}")
 

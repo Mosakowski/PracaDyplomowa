@@ -15,6 +15,10 @@ object Users : Table("users") {
     override val primaryKey = PrimaryKey(id)
 }
 
+enum class FieldType {
+    PILKA_NOZNA, KORT_TENISOWY, KOSZYKOWKA, INNE
+}
+
 // Enum do ról użytkowników
 enum class UserRole{
     ADMIN, CLIENT, FIELD_OWNER
@@ -35,17 +39,12 @@ object Facilities : Table("facilities") {
 object Fields : Table("fields") {
     val id = integer("field_id").autoIncrement()
     val facilityId = integer("facility_id").references(Facilities.id)
-    val name = varchar("name", 255)
-    val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
-    val typeField = enumerationByName("field_type", 50, TypeField::class)
-    val isActive = bool("is_active").default(true)
+    val name = varchar("name", 100)
 
-    // JSONB - kluczowe dla Twojego projektu ("Elastyczny Grafik")
-    // Na początku użyjemy text, żeby nie komplikować konfiguracji, Exposed obsługuje JSONB ale wymaga to dodatkowego setupu dialektu
-    val hours = text("hours")
-    val exceptions = text("exceptions").nullable()
+    // 👇 ZMIEŃ/DODAJ TĘ LINIĘ:
+    // Musimy jawnie podać klasę enuma (FieldType::class), żeby Exposed wiedział co robić
+    val fieldType = enumerationByName("field_type", 20, FieldType::class)
 
-    val slotLengtMinutes = integer("slot_lengt_minutes")
     val pricePerSlot = decimal("price_per_slot", 10, 2)
 
     override val primaryKey = PrimaryKey(id)
