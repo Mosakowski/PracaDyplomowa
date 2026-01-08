@@ -9,6 +9,7 @@ import io.ktor.http.* // Ważne: Do ContentType
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.pracainzynierska.sportbooking.BookingDto
+import io.ktor.client.statement.bodyAsText
 
 class SportApi {
 
@@ -62,7 +63,14 @@ class SportApi {
             header("X-User-Id", userId)
             setBody(request)
         }
-        return response.status == HttpStatusCode.Created
+        if (response.status == HttpStatusCode.Created) {
+            return true
+        } else {
+            // Jeśli serwer zwrócił błąd (400, 409 itp.), czytamy jego treść
+            val serverMessage = response.bodyAsText()
+            // I rzucamy wyjątkiem, który złapie Twój App.kt
+            throw Exception(serverMessage)
+        }
     }
 
     suspend fun getMyBookings(userId: Int): List<BookingDto> {
@@ -87,6 +95,13 @@ class SportApi {
             setBody(request)
         }
         return response.status == HttpStatusCode.Created
+    }
+
+    suspend fun cancelBooking(userId: Int, bookingId: Int): Boolean {
+        val response = client.delete("$baseUrl/bookings/$bookingId") {
+            header("X-User-Id", userId)
+        }
+        return response.status == io.ktor.http.HttpStatusCode.OK
     }
 }
 

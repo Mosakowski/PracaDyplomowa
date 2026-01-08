@@ -44,13 +44,16 @@ data class AuthResponse(
 data class BookingDto(
     val id: Int,
     val fieldId: Int,
-    val fieldName: String, // Przydatne do wyświetlania na liście "Moje rezerwacje"
-    val startTimestamp: Long, // Data w milisekundach
+    val fieldName: String,
+    val startTimestamp: Long,
     val endTimestamp: Long,
     val status: String,
-    val price: Double
-)
+    val price: Double,
 
+    // 👇 NOWE POLA: Gotowe napisy przygotowane przez serwer
+    val startDate: String, // np. "2024-09-01 12:00"
+    val endDate: String    // np. "2024-09-01 13:00"
+)
 @Serializable
 data class CreateBookingRequest(
     val fieldId: Int,
