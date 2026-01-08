@@ -2,6 +2,8 @@ package org.pracainzynierska.sportbooking
 
 import org.jetbrains.exposed.sql.*
 import org.pracainzynierska.sportbooking.DatabaseFactory.dbQuery
+import org.pracainzynierska.sportbooking.Users
+import org.pracainzynierska.sportbooking.UserRole
 
 class UserRepository {
 
@@ -40,6 +42,24 @@ class UserRepository {
             }
             .singleOrNull()
     }
+
+    suspend fun getUserByEmail(email: String): User? = dbQuery {
+        // SELECT * FROM users WHERE email = ...
+        Users.select { Users.email eq email }
+            .map {
+                User(
+                    id = it[Users.id],
+                    email = it[Users.email],
+                    name = it[Users.name],
+                    passwordHash = it[Users.password],
+
+                    // 👇 Tu mapujemy kolumnę userType (z bazy) na pole role (w klasie User)
+                    role = it[Users.role]
+                )
+            }
+            .singleOrNull()
+    }
+
 }
 
 // Pomocnicza klasa wewnętrzna (tylko dla backendu), żeby wygodnie przekazywać dane z bazy
@@ -49,4 +69,13 @@ data class UserRow(
     val passwordHash: String,
     val name: String,
     val role: UserRole
+)
+
+// To jest model wewnętrzny serwera - odwzorowanie wiersza z bazy
+data class User(
+    val id: Int,
+    val email: String,
+    val name: String,
+    val passwordHash: String,
+    val role: UserRole // 👈 Twoje UserRole z Schema.kt
 )

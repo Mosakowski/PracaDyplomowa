@@ -5,6 +5,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.mindrot.jbcrypt.BCrypt
 import java.util.UUID
 
 fun Route.authRoutes() {
@@ -30,23 +31,24 @@ fun Route.authRoutes() {
         // POST /api/auth/login
         post("/login") {
             val request = call.receive<LoginRequest>()
+            // repo.login lub validateUser powinno zwracać obiekt User (z danymi z bazy)
+            val user = repo.getUserByEmail(request.email)
 
-            // 1. Znajdź usera w bazie
-            val user = repo.findUserByEmail(request.email)
+            if (user != null && BCrypt.checkpw(request.password, user.passwordHash)) {
+                // Generujemy token (u Ciebie to pewnie prosty UUID)
+                val token = java.util.UUID.randomUUID().toString()
 
-            // 2. Sprawdź hasło (czy pasuje do hasha)
-            if (user != null && Security.checkPassword(request.password, user.passwordHash)) {
-                // Generujemy prosty token (w przyszłości zamienimy na JWT)
-                val fakeToken = UUID.randomUUID().toString()
-
-                call.respond(AuthResponse(
-                    token = fakeToken,
-                    userId = user.id,
-                    name = user.name,
-                    role = user.role.toString()
-                ))
+                // 👇 TU JEST ZMIANA: Dodajemy user.role do odpowiedzi
+                call.respond(
+                    AuthResponse(
+                        token = token,
+                        userId = user.id,
+                        name = user.name, // lub email, zależy co tam masz
+                        role = user.role.toString() // Zamieniamy Enum na String
+                    )
+                )
             } else {
-                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
+                call.respond(HttpStatusCode.Unauthorized, "Błędne dane logowania")
             }
         }
     }

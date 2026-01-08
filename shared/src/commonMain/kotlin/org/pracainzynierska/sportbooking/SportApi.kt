@@ -70,5 +70,23 @@ class SportApi {
             header("X-User-Id", userId)
         }.body()
     }
+
+    suspend fun addFacility(userId: Int, request: AddFacilityRequest): Boolean {
+        val response = client.post("$baseUrl/facilities") {
+            contentType(ContentType.Application.Json)
+            header("X-User-Id", userId)
+            setBody(request)
+        }
+        return response.status == HttpStatusCode.Created
+    }
+
+    suspend fun addField(userId: Int, request: AddFieldRequest): Boolean {
+        val response = client.post("$baseUrl/fields") { // Nowy endpoint /api/fields
+            contentType(ContentType.Application.Json)
+            header("X-User-Id", userId)
+            setBody(request)
+        }
+        return response.status == HttpStatusCode.Created
+    }
 }
 

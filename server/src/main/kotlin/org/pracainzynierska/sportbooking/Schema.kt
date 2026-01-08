@@ -27,12 +27,11 @@ enum class UserRole{
 // tabela obiektów
 object Facilities : Table("facilities") {
     val id = integer("facility_id").autoIncrement()
-    val ownerId = integer("user_id").references(Users.id)
-    val name = varchar("name", 255)
+    val userId = integer("user_id").references(Users.id) // Wiążemy obiekt z użytkownikiem
+    val name = varchar("name", 100)
     val location = varchar("location", 255)
     val description = text("description").nullable()
-    val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
-
+    // ...
     override val primaryKey = PrimaryKey(id)
 }
 

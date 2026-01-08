@@ -11,6 +11,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.pracainzynierska.sportbooking.AddFacilityRequest
+import kotlinx.datetime.*
 
 // Importy modeli z modułu Shared
 import org.pracainzynierska.sportbooking.FacilityDto
@@ -20,6 +22,7 @@ import org.pracainzynierska.sportbooking.LoginRequest
 import org.pracainzynierska.sportbooking.AuthResponse
 import org.pracainzynierska.sportbooking.CreateBookingRequest
 import org.pracainzynierska.sportbooking.BookingDto
+import kotlin.time.ExperimentalTime
 
 enum class Screen {
     LOGIN, LIST, MY_BOOKINGS
@@ -144,55 +147,135 @@ fun LoginScreen(onLoginSuccess: (AuthResponse) -> Unit, api: SportApi) {
 // --- EKRAN 2: LISTA OBIEKTÓW ---
 @Composable
 fun FacilitiesScreen(api: SportApi, currentUser: AuthResponse?) {
+    // Zmieniamy to na pamięć, którą można "wymusić" do odświeżenia (klucz refreshTrigger)
+    var refreshTrigger by remember { mutableStateOf(0) }
     var facilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    // Pobieramy dane za każdym razem, gdy zmieni się refreshTrigger
+    LaunchedEffect(refreshTrigger) {
         try { facilities = api.getFacilities() } catch (e: Exception) { println(e) }
     }
 
-    Column(Modifier.padding(16.dp)) {
-        Text("Dostępne obiekty", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(16.dp))
+    Box(Modifier.fillMaxSize()) { // Używamy Box, żeby móc pozycjonować elementy (np. FAB)
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Dostępne obiekty", style = MaterialTheme.typography.titleLarge)
 
-        if (facilities.isEmpty()) {
-            Text("Ładowanie lub brak obiektów...")
+                // Przycisk dodawania - widoczny dla zalogowanych
+                if (currentUser != null && currentUser?.role == "FIELD_OWNER") {
+                    Button(onClick = { showAddDialog = true }) {
+                        Text("+ Dodaj")
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (facilities.isEmpty()) {
+                Text("Brak obiektów. Dodaj pierwszy!")
+            }
+
+            LazyColumn {
+                items(facilities.size) { index ->
+                    FacilityCard(
+                        facility = facilities[index],
+                        api = api,
+                        currentUser = currentUser,
+                        onRefresh = { refreshTrigger++ } // 👈 PRZEKAZUJEMY ODŚWIEŻANIE DALEJ
+                    )
+                }
+            }
         }
 
-        facilities.forEach { facility ->
-            FacilityCard(facility, api, currentUser)
+        // Dialog dodawania
+        if (showAddDialog && currentUser != null) {
+            AddFacilityDialog(
+                userId = currentUser.userId,
+                api = api,
+                onDismiss = { showAddDialog = false },
+                onSuccess = {
+                    showAddDialog = false
+                    refreshTrigger++ // To wymusi ponowne pobranie listy (LaunchedEffect)
+                }
+            )
         }
     }
 }
 
 @Composable
-fun FacilityCard(facility: FacilityDto, api: SportApi, currentUser: AuthResponse?) {
-    var showDialog by remember { mutableStateOf(false) }
+fun FacilityCard(
+    facility: FacilityDto,
+    api: SportApi,
+    currentUser: AuthResponse?,
+    onRefresh: () -> Unit // 👈 NOWY ARGUMENT
+) {
+    var showBookingDialog by remember { mutableStateOf(false) }
+    var showAddFieldDialog by remember { mutableStateOf(false) } // 👈 NOWY STAN
 
     Card(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(Modifier.padding(16.dp)) {
             Text(facility.name, style = MaterialTheme.typography.titleMedium)
             Text("Lokalizacja: ${facility.location}")
 
-            // Wypisz boiska dostępne w tym obiekcie (dla informacji)
             if (facility.fields.isNotEmpty()) {
-                Text("Boiska: ${facility.fields.joinToString { it.name }}", style = MaterialTheme.typography.bodySmall)
+                Text("Dostępne: ${facility.fields.joinToString { it.name }}", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text("Brak boisk - dodaj jakieś!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
             Spacer(Modifier.height(8.dp))
+
+            // Panel przycisków
+            // Panel przycisków
             if (currentUser != null) {
-                Button(onClick = { showDialog = true }) { Text("Rezerwuj") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+                    // 1. Przycisk Rezerwacji (Dla KAŻDEGO zalogowanego)
+                    Button(onClick = { showBookingDialog = true }) {
+                        Text("Rezerwuj")
+                    }
+
+                    // 2. Przycisk Dodawania Boiska (TYLKO dla Właściciela)
+                    // Upewnij się, że ten fragment występuje TYLKO RAZ w kodzie!
+                    if (currentUser.role == "FIELD_OWNER") {
+                        OutlinedButton(onClick = { showAddFieldDialog = true }) {
+                            Text("+ Boisko")
+                        }
+                    }
+                }
             } else {
                 Text("Zaloguj się, aby zarezerwować", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
 
-    if (showDialog && currentUser != null) {
-        ReservationDialog(facility, currentUser.userId, api) { showDialog = false }
+    // Dialog Rezerwacji
+    if (showBookingDialog && currentUser != null) {
+        ReservationDialog(facility, currentUser.userId, api) { showBookingDialog = false }
+    }
+
+    // Dialog Dodawania Boiska (NOWY)
+    if (showAddFieldDialog && currentUser != null) {
+        AddFieldDialog(
+            facilityId = facility.id,
+            userId = currentUser.userId,
+            api = api,
+            onDismiss = { showAddFieldDialog = false },
+            onSuccess = {
+                showAddFieldDialog = false
+                onRefresh() // 👈 Odśwież listę obiektów, żeby zobaczyć nowe boisko
+            }
+        )
     }
 }
 
 // --- DIALOG REZERWACJI (Z WYBOREM BOISKA I FIXEM NA DATY) ---
+@OptIn(ExperimentalTime::class)
 @Composable
 fun ReservationDialog(
     facility: FacilityDto,
@@ -244,12 +327,16 @@ fun ReservationDialog(
                 onClick = {
                     scope.launch {
                         try {
-                            // --- FIX: Hardcoded Timestamp (żeby ominąć problem z biblioteką w Wasm) ---
-                            // Normalnie parsowalibyśmy dateText i timeStart
-                            val startTs = 1719842400000L // 2024-07-01 14:00
-                            val endTs = 1719846000000L   // 2024-07-01 15:00
+                            // CZYSTY TEKST - Żadnych bibliotek dat!
+                            // Sklejamy to co wpisałeś w jeden napis.
+                            // Format musi pasować do tego, co Backend parsuje (LocalDateTime):
+                            // "RRRR-MM-DD" + "T" + "GG:MM"
+                            // Przykład: "2024-06-01T14:00"
+                            val startString = "${dateText}T${timeStart}"
+                            val endString = "${dateText}T${timeEnd}"
 
-                            val request = CreateBookingRequest(selectedFieldId!!, startTs, endTs)
+                            // Wysyłamy napisy
+                            val request = CreateBookingRequest(selectedFieldId!!, startString, endString)
 
                             val success = api.createBooking(userId, request)
                             if (success) {
@@ -261,6 +348,7 @@ fun ReservationDialog(
                             }
                         } catch (e: Exception) {
                             message = "Błąd: ${e.message}"
+                            println(e)
                         }
                     }
                 }
@@ -308,4 +396,139 @@ fun BookingCard(booking: BookingDto) {
             Text("Cena: ${booking.price} PLN", color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+@Composable
+fun AddFacilityDialog(
+    userId: Int,
+    api: SportApi,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit // Żeby odświeżyć listę po dodaniu
+) {
+    var name by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dodaj nowy obiekt") },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nazwa obiektu") })
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Lokalizacja") })
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Opis (opcjonalnie)") })
+
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                scope.launch {
+                    try {
+                        val request = AddFacilityRequest(name, location, description)
+                        val success = api.addFacility(userId, request)
+                        if (success) {
+                            onSuccess() // Odśwież listę
+                            onDismiss() // Zamknij okno
+                        } else {
+                            errorMessage = "Błąd podczas dodawania."
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Błąd: ${e.message}"
+                    }
+                }
+            }) {
+                Text("Dodaj")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Anuluj") }
+        }
+    )
+}
+
+@Composable
+fun AddFieldDialog(
+    facilityId: Int,
+    userId: Int,
+    api: SportApi,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var priceStr by remember { mutableStateOf("") }
+    // Domyślny typ
+    var selectedType by remember { mutableStateOf("PILKA_NOZNA") }
+
+    // Lista musi zgadzać się z Enumem w Backendzie!
+    val types = listOf("PILKA_NOZNA", "KORT_TENISOWY", "KOSZYKOWKA", "INNE")
+
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dodaj boisko do obiektu") },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nazwa (np. Kort 1)") })
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = priceStr, onValueChange = { priceStr = it }, label = { Text("Cena za godzinę (PLN)") })
+
+                Spacer(Modifier.height(16.dp))
+                Text("Typ boiska:", style = MaterialTheme.typography.titleSmall)
+
+                // Radio Buttons dla Typów
+                types.forEach { type ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = (selectedType == type),
+                            onClick = { selectedType = type }
+                        )
+                        Text(type)
+                    }
+                }
+
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                scope.launch {
+                    try {
+                        val price = priceStr.toDoubleOrNull()
+                        if (price == null) {
+                            errorMessage = "Podaj poprawną cenę!"
+                            return@launch
+                        }
+
+                        val request = AddFieldRequest(facilityId, name, selectedType, price)
+                        val success = api.addField(userId, request)
+
+                        if (success) {
+                            onSuccess()
+                            onDismiss()
+                        } else {
+                            errorMessage = "Błąd zapisu."
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Błąd: ${e.message}"
+                    }
+                }
+            }) {
+                Text("Zapisz")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Anuluj") }
+        }
+    )
 }

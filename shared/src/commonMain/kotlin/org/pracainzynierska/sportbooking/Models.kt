@@ -54,8 +54,8 @@ data class BookingDto(
 @Serializable
 data class CreateBookingRequest(
     val fieldId: Int,
-    val startTimestamp: Long,
-    val endTimestamp: Long
+    val startIso: String, // np. "2024-06-01T14:00"
+    val endIso: String    // np. "2024-06-01T15:00"
 )
 // Dodaj nową klasę dla Boiska (widok uproszczony)
 @Serializable
@@ -63,4 +63,19 @@ data class FieldDto(
     val id: Int,
     val name: String,
     val type: String // np. "PIŁKA_NOŻNA"
+)
+
+@Serializable
+data class AddFacilityRequest(
+    val name: String,
+    val location: String,
+    val description: String
+)
+
+@Serializable
+data class AddFieldRequest(
+    val facilityId: Int, // Do którego obiektu należy to boisko?
+    val name: String,    // np. "Kort 1"
+    val fieldType: String, // np. "KORT_TENISOWY" (jako napis)
+    val price: Double // np. 50.0
 )
