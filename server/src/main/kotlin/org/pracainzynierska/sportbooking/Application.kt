@@ -54,9 +54,5 @@ fun Application.module() {
             default("index.html")
             enableAutoHeadResponse()
         }
-        get("/") {
-            call.respondText("Ktor: ${Greeting().greet()}")
-
-        }
     }
 }
