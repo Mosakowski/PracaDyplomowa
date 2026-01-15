@@ -1,26 +1,23 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.android.build.api.dsl.ApplicationExtension // 👈 WAŻNY IMPORT
 
-//  ZMIANA 1: Sprawdzamy, czy istnieje plik local.properties (jest lokalnie, nie ma w Dockerze)
 val localProperties = project.rootProject.file("local.properties")
 val isAndroidAvailable = localProperties.exists()
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    //  ZMIANA 2: Dodajemy "apply false" - nie włączamy Androida automatycznie
-    alias(libs.plugins.androidApplication) apply false
+    alias(libs.plugins.androidApplication) apply false //  apply false musi zostać dla rendera
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
 }
 
-// 👇ZMIANA 3: Włączamy plugin Androida TYLKO jeśli mamy środowisko (lokalnie)
 if (isAndroidAvailable) {
     apply(plugin = "com.android.application")
 }
 
 kotlin {
-    //  ZMIANA 4: Konfigurujemy Androida TYLKO w bloku if
     if (isAndroidAvailable) {
         androidTarget {
             compilerOptions {
@@ -41,7 +38,6 @@ kotlin {
     }
 
     sourceSets {
-        // ZMIANA 5: Zależności Androida też wrzucamy w if (dla bezpieczeństwa)
         if (isAndroidAvailable) {
             val androidMain by getting {
                 dependencies {
@@ -70,9 +66,9 @@ kotlin {
     }
 }
 
-//  ZMIANA 6: Cała sekcja konfiguracji Androida w klamrze if
+//  ZMIANA: Zamiast "android {}", używamy "extensions.configure"
 if (isAndroidAvailable) {
-    android {
+    extensions.configure<ApplicationExtension> {
         namespace = "org.pracainzynierska.sportbooking"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -101,8 +97,8 @@ if (isAndroidAvailable) {
 }
 
 dependencies {
-    //  ZMIANA 7: Zależność debugowa też tylko dla Androida
     if (isAndroidAvailable) {
-        debugImplementation(compose.uiTooling)
+        //  ZMIANA: Zamiast debugImplementation(...) używamy add("debugImplementation", ...)
+        add("debugImplementation", compose.uiTooling)
     }
 }
