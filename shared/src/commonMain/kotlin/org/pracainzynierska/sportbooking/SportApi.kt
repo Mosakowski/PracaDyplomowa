@@ -19,8 +19,9 @@ class SportApi {
         }
     }
 
-    // Pamiętaj: localhost działa na Webie. Na Androidzie będziesz musiał to zmienić na 10.0.2.2!
-    private val baseUrl = "http://localhost:8080/api"
+
+    //zmienione
+    private val baseUrl = "https://rezerwacjaboisk.onrender.com/api"
 
     // 1. Pobieranie boisk
     suspend fun getFacilities(): List<FacilityDto> {
