@@ -3,7 +3,7 @@ package org.pracainzynierska.sportbooking
 import org.mindrot.jbcrypt.BCrypt
 
 object Security {
-    // Funkcja do "solenia" i haszowania hasła
+    // Funkcja haszowania hasła
     fun hashPassword(password: String): String {
         return BCrypt.hashpw(password, BCrypt.gensalt())
     }

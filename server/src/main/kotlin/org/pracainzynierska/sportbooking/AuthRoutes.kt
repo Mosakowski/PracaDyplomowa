@@ -6,7 +6,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.mindrot.jbcrypt.BCrypt
-import java.util.UUID
+
 
 fun Route.authRoutes() {
     val repo = UserRepository()
@@ -22,7 +22,10 @@ fun Route.authRoutes() {
             val newId = repo.createUser(request)
 
             if (newId != null) {
-                call.respond(HttpStatusCode.Created, mapOf("message" to "User created", "id" to newId))
+                call.respond(HttpStatusCode.Created, mapOf(
+                    "message" to "User created",
+                    "id" to newId.toString()
+                ))
             } else {
                 call.respond(HttpStatusCode.Conflict, mapOf("error" to "Email already exists"))
             }
@@ -35,16 +38,15 @@ fun Route.authRoutes() {
             val user = repo.getUserByEmail(request.email)
 
             if (user != null && BCrypt.checkpw(request.password, user.passwordHash)) {
-                // Generujemy token (u Ciebie to pewnie prosty UUID)
+                // Generujemy token
                 val token = java.util.UUID.randomUUID().toString()
 
-                // 👇 TU JEST ZMIANA: Dodajemy user.role do odpowiedzi
                 call.respond(
                     AuthResponse(
                         token = token,
                         userId = user.id,
-                        name = user.name, // lub email, zależy co tam masz
-                        role = user.role.toString() // Zamieniamy Enum na String
+                        name = user.name,
+                        role = user.role.toString()
                     )
                 )
             } else {

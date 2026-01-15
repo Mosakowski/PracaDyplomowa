@@ -9,13 +9,13 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 object DatabaseFactory {
     fun init() {
         val driverClassName = "org.postgresql.Driver"
-        val jdbcURL = "jdbc:postgresql://localhost:5432/sport_booking" // Adres bazy w Dockerze
-        val user = "admin"
-        val password = "admin"
+        val jdbcURL = System.getenv("JDBC_DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/sportbooking" // Adres bazy w Dockerze
+        val user = System.getenv("JDBC_DATABASE_USERNAME") ?: "postgres"
+        val password = System.getenv("JDBC_DATABASE_PASSWORD") ?: "admin" // hasło lokalne
 
         val database = Database.connect(jdbcURL, driverClassName, user, password)
 
-        // Magia Exposed: Automatycznie tworzy tabele, jeśli ich nie ma!
+        // Exposed: Automatycznie tworzy tabele, jeśli ich nie ma
         transaction(database) {
             SchemaUtils.create(Users, Facilities, Fields, Bookings)
         }

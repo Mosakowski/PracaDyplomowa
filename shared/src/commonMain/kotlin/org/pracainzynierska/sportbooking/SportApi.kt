@@ -38,6 +38,7 @@ class SportApi {
         return response.status == HttpStatusCode.Created
     }
 
+
     // 3. Logowanie (NOWE)
     // Zwraca AuthResponse (token + dane usera)
     suspend fun login(request: LoginRequest): AuthResponse {
@@ -102,6 +103,107 @@ class SportApi {
             header("X-User-Id", userId)
         }
         return response.status == io.ktor.http.HttpStatusCode.OK
+    }
+
+    // Edycja
+    suspend fun updateFacility(userId: Int, facilityId: Int, request: AddFacilityRequest): Boolean {
+        val response = client.put("$baseUrl/facilities/$facilityId") {
+            contentType(ContentType.Application.Json)
+            header("X-User-Id", userId)
+            setBody(request)
+        }
+        return response.status == HttpStatusCode.OK
+    }
+
+    // Usuwanie
+    suspend fun deleteFacility(userId: Int, facilityId: Int): Boolean {
+        val response = client.delete("$baseUrl/facilities/$facilityId") {
+            header("X-User-Id", userId)
+        }
+        return response.status == HttpStatusCode.OK
+    }
+
+    suspend fun getTakenSlots(facilityId: Int, date: String): List<BookingDto> {
+        // date musi być w formacie "YYYY-MM-DD"
+        return client.get("$baseUrl/bookings/taken") {
+            parameter("facilityId", facilityId)
+            parameter("date", date)
+        }.body()
+    }
+
+    // Edycja boiska (PUT /api/fields/{id})
+    suspend fun updateField(userId: Int, fieldId: Int, request: AddFieldRequest): Boolean {
+        val response = client.put("$baseUrl/fields/$fieldId") {
+            contentType(ContentType.Application.Json)
+            header("X-User-Id", userId)
+            setBody(request)
+        }
+        return response.status == HttpStatusCode.OK
+    }
+
+    // Usuwanie boiska (DELETE /api/fields/{id})
+    suspend fun deleteField(userId: Int, fieldId: Int): Boolean {
+        val response = client.delete("$baseUrl/fields/$fieldId") {
+            header("X-User-Id", userId)
+        }
+        return response.status == HttpStatusCode.OK
+    }
+
+    suspend fun getFacilityStats(userId: Int, facilityId: Int): FacilityStatsDto {
+        return client.get("$baseUrl/owner/stats/$facilityId") {
+            header("X-User-Id", userId)
+        }.body()
+    }
+
+    suspend fun getOwnerBookings(userId: Int, facilityId: Int, date: String): List<OwnerBookingDto> {
+        return client.get("$baseUrl/owner/bookings/$facilityId") {
+            header("X-User-Id", userId)
+            parameter("date", date)
+        }.body()
+    }
+
+    suspend fun cancelByOwner(userId: Int, bookingId: Int): Boolean {
+        val response = client.delete("$baseUrl/owner/booking/$bookingId") {
+            header("X-User-Id", userId)
+        }
+        return response.status == HttpStatusCode.OK
+    }
+
+    suspend fun blockSlot(userId: Int, request: CreateBookingRequest): Boolean {
+        val response = client.post("$baseUrl/owner/block") {
+            contentType(ContentType.Application.Json)
+            header("X-User-Id", userId)
+            setBody(request)
+        }
+        return response.status == HttpStatusCode.Created
+    }
+
+    suspend fun getRecentBookings(userId: Int, facilityId: Int): List<OwnerBookingDto> {
+        return client.get("$baseUrl/owner/recent/$facilityId") {
+            header("X-User-Id", userId)
+        }.body()
+    }
+
+    suspend fun getAdminStats(): AdminStatsDto {
+        return client.get("$baseUrl/admin/stats").body()
+    }
+
+    suspend fun getAllUsers(): List<UserDto> {
+        return client.get("$baseUrl/admin/users").body()
+    }
+
+    suspend fun deleteUser(userId: Int): Boolean {
+        val response = client.delete("$baseUrl/admin/users/$userId")
+        return response.status == HttpStatusCode.OK
+    }
+
+    suspend fun getAllFacilitiesAdmin(): List<FacilityAdminDto> {
+        return client.get("$baseUrl/admin/facilities").body()
+    }
+
+    suspend fun deleteFacilityAdmin(id: Int): Boolean {
+        val response = client.delete("$baseUrl/admin/facilities/$id")
+        return response.status == HttpStatusCode.OK
     }
 }
 

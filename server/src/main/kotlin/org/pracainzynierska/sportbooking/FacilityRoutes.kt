@@ -32,30 +32,115 @@ fun Route.facilityRoutes() {
             // 4. Odpowiadamy sukcesem
             call.respond(HttpStatusCode.Created, mapOf("id" to newId.toString(), "message" to "Obiekt dodany!"))
         }
+        put("/{id}") {
+            val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
+            val facilityId = call.parameters["id"]?.toIntOrNull()
+
+            if (userIdHeader == null || facilityId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Brak ID lub autoryzacji")
+                return@put
+            }
+
+            // Używamy tego samego modelu co przy dodawaniu (AddFacilityRequest)
+            val request = call.receive<AddFacilityRequest>()
+
+            val updated = repo.update(facilityId, userIdHeader, request)
+
+            if (updated) {
+                call.respond(HttpStatusCode.OK, "Zaktualizowano")
+            } else {
+                call.respond(HttpStatusCode.NotFound, "Nie znaleziono obiektu lub brak uprawnień")
+            }
+        }
+
+        // USUWANIE (DELETE /{id})
+        delete("/{id}") {
+            val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
+            val facilityId = call.parameters["id"]?.toIntOrNull()
+
+            if (userIdHeader == null || facilityId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Brak ID lub autoryzacji")
+                return@delete
+            }
+
+            val deleted = repo.delete(facilityId, userIdHeader)
+
+            if (deleted) {
+                call.respond(HttpStatusCode.OK, "Usunięto")
+            } else {
+                call.respond(HttpStatusCode.NotFound, "Nie znaleziono obiektu lub brak uprawnień")
+            }
+        }
+
+
     }
 
     route("/api/fields") {
         post {
             // 1. Sprawdzamy autoryzację
-            val userIdHeader = call.request.header("X-User-Id")
+            val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
             if (userIdHeader == null) {
                 call.respond(HttpStatusCode.Unauthorized, "Brak autoryzacji")
                 return@post
             }
 
             try {
-                // 2. Odbieramy dane
                 val request = call.receive<AddFieldRequest>()
 
-                // 3. Zapisujemy
-                val newId = repo.addField(request)
+                // 2. PRZEKAZUJEMY userIdHeader DO REPOZYTORIUM
+                val newId = repo.addField(userIdHeader, request)
 
                 call.respond(HttpStatusCode.Created, mapOf("id" to newId.toString(), "message" to "Boisko dodane!"))
+
+            } catch (e: IllegalAccessException) {
+                //  3. JEŚLI REPO RZUCIŁO BŁĄD, ŻE TO NIE TWÓJ OBIEKT
+                call.respond(HttpStatusCode.Forbidden, "Nie masz prawa dodawać boisk do tego obiektu!")
             } catch (e: IllegalArgumentException) {
-                // To wyłapie sytuację, gdy wyślesz zły typ (np. "PING_PONG" którego nie ma w Enumie)
-                call.respond(HttpStatusCode.BadRequest, "Niepoprawny typ boiska! Dostępne: PILKA_NOZNA, KORT_TENISOWY, KOSZYKOWKA, INNE")
+                call.respond(HttpStatusCode.BadRequest, "Niepoprawny typ boiska!")
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, "Błąd serwera: ${e.message}")
+            }
+        }
+        // EDYCJA KONKRETNEGO BOISKA
+        put("/{id}") {
+            val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
+            val fieldId = call.parameters["id"]?.toIntOrNull()
+
+            if (userIdHeader == null || fieldId == null) {
+                call.respond(HttpStatusCode.Unauthorized, "Brak autoryzacji lub ID")
+                return@put
+            }
+
+            try {
+                val request = call.receive<AddFieldRequest>()
+                val updated = repo.updateField(userIdHeader, fieldId, request)
+
+                if (updated) {
+                    call.respond(HttpStatusCode.OK, "Boisko zaktualizowane")
+                } else {
+                    call.respond(HttpStatusCode.Forbidden, "Nie znaleziono boiska lub brak uprawnień")
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "Błąd danych: ${e.message}")
+            }
+        }
+
+        // USUWANIE KONKRETNEGO BOISKA
+        delete("/{id}") {
+            val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
+            val fieldId = call.parameters["id"]?.toIntOrNull()
+
+            if (userIdHeader == null || fieldId == null) {
+                call.respond(HttpStatusCode.Unauthorized, "Brak autoryzacji lub ID")
+                return@delete
+            }
+
+            val deleted = repo.deleteField(userIdHeader, fieldId)
+
+            if (deleted) {
+                call.respond(HttpStatusCode.OK, "Boisko usunięte")
+            } else {
+                call.respond(HttpStatusCode.Forbidden, "Nie znaleziono boiska lub brak uprawnień")
             }
         }
     }
