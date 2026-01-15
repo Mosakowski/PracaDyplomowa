@@ -9,8 +9,8 @@ RUN ./gradlew :server:installDist --no-daemon
 # 2. Budujemy Frontend (Wasm)
 RUN ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon
 
-# ETAP 2: Uruchomienie (Lekki obraz Linuxa)
-FROM openjdk:21-jdk-slim
+# ETAP 2: Uruchomienie (ZMIANA: Używamy Eclipse Temurin zamiast OpenJDK)
+FROM eclipse-temurin:21-jre
 
 # Tworzymy folder na aplikację
 WORKDIR /app
@@ -19,7 +19,6 @@ WORKDIR /app
 COPY --from=build /home/gradle/src/server/build/install/server /app/server
 
 # Kopiujemy zbudowany frontend z Etapu 1 do folderu static
-# (To jest ten folder, który wskazaliśmy w Application.kt!)
 COPY --from=build /home/gradle/src/composeApp/build/dist/wasmJs/productionExecutable /app/static
 
 # Otwieramy port 8080
