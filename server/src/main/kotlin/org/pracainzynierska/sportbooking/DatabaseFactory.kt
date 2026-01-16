@@ -9,9 +9,9 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 object DatabaseFactory {
     fun init() {
         val driverClassName = "org.postgresql.Driver"
-        val jdbcURL = System.getenv("JDBC_DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/sportbooking" // Adres bazy w Dockerze
-        val user = System.getenv("JDBC_DATABASE_USERNAME") ?: "postgres"
-        val password = System.getenv("JDBC_DATABASE_PASSWORD") ?: "admin" // hasło lokalne
+        val jdbcURL = System.getenv("JDBC_DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/sport_booking" // Adres bazy w Dockerze
+        val user = System.getenv("JDBC_DATABASE_USERNAME") ?: "admin"
+        val password = System.getenv("JDBC_DATABASE_PASSWORD") ?: "admin" // hasło lok  alne
 
         val database = Database.connect(jdbcURL, driverClassName, user, password)
 

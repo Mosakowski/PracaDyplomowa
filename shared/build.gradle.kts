@@ -55,6 +55,14 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        if (isAndroidAvailable) {
+            val androidMain by getting {
+                dependencies {
+                    // Silnik dla Androida w wersji pasującej do Core (3.0.1)
+                    implementation("io.ktor:ktor-client-android:3.0.1")
+                }
+            }
+        }
     }
 }
 

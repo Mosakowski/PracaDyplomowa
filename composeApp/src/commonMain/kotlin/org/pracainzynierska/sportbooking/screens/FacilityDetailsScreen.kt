@@ -144,7 +144,7 @@ fun FacilityDetailsScreen(
             ) {
                 Icon(Icons.Default.Assessment, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Panel Zarządzania (Kalendarz i Przychody)")
+                Text("Panel Zarządzania")
             }
             Spacer(Modifier.height(16.dp))
         }

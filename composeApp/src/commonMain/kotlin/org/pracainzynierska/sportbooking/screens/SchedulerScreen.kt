@@ -23,7 +23,6 @@ import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.components.BlikPaymentDialog
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 import org.pracainzynierska.sportbooking.theme.RacingGreenLight
-import org.pracainzynierska.sportbooking.utils.addMinutes
 import org.pracainzynierska.sportbooking.utils.calculateTotalPrice
 import org.pracainzynierska.sportbooking.utils.mergeSlotsToRequests
 import kotlin.time.ExperimentalTime
@@ -43,13 +42,24 @@ fun SchedulerScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var selectedSlots by remember { mutableStateOf<Set<Pair<Int, LocalTime>>>(emptySet()) }
     var showPaymentDialog by remember { mutableStateOf(false) }
+
+    // 👇 NOWE: Flaga ładowania
+    var isLoading by remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(selectedDate, refreshTrigger) {
+        isLoading = true // Startujemy ładowanie
+        takenSlots = emptyList() // Czyścimy widok z poprzednich danych
+        selectedSlots = emptySet()
+
         try {
             takenSlots = api.getTakenSlots(facility.id, selectedDate.toString())
-            selectedSlots = emptySet()
-        } catch (e: Exception) { println("Błąd: $e") }
+        } catch (e: Exception) {
+            println("Błąd: $e")
+        } finally {
+            isLoading = false // Kończymy ładowanie
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -93,61 +103,68 @@ fun SchedulerScreen(
             }
 
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
-                facility.fields.forEach { field ->
-                    Text(field.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                        val scrollState = rememberScrollState()
-                        val coroutineScope = rememberCoroutineScope()
-                        Row(Modifier.fillMaxWidth().horizontalScroll(scrollState).pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.changes.isNotEmpty() && event.type == PointerEventType.Scroll) {
-                                        val change = event.changes.first()
-                                        coroutineScope.launch { scrollState.scrollBy(change.scrollDelta.y * 50f) }
-                                        change.consume()
+                // 👇 NOWE: Spinner zamiast pustej przestrzeni
+                if (isLoading) {
+                    Box(Modifier.fillMaxSize().height(300.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = RacingGreen)
+                    }
+                } else {
+                    facility.fields.forEach { field ->
+                        Text(field.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                            val scrollState = rememberScrollState()
+                            val coroutineScope = rememberCoroutineScope()
+                            Row(Modifier.fillMaxWidth().horizontalScroll(scrollState).pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (event.changes.isNotEmpty() && event.type == PointerEventType.Scroll) {
+                                            val change = event.changes.first()
+                                            coroutineScope.launch { scrollState.scrollBy(change.scrollDelta.y * 50f) }
+                                            change.consume()
+                                        }
                                     }
                                 }
-                            }
-                        }) {
-                            val startHour = facility.openingTime.split(":").first().toInt()
-                            val endHour = facility.closingTime.split(":").first().toInt()
-                            val step = field.minSlotDuration
-                            for (currentMinutes in (startHour * 60) until (endHour * 60) step step) {
-                                val h = currentMinutes / 60
-                                val m = currentMinutes % 60
-                                val slotStart = LocalTime(h, m)
-                                val endTotal = currentMinutes + step
-                                val slotEnd = if (endTotal >= 24 * 60) LocalTime(23, 59) else LocalTime(endTotal / 60, endTotal % 60)
-                                val startStr = "${if(h<10)"0$h" else h}:${if(m<10)"0$m" else m}"
+                            }) {
+                                val startHour = facility.openingTime.split(":").first().toInt()
+                                val endHour = facility.closingTime.split(":").first().toInt()
+                                val step = field.minSlotDuration
+                                for (currentMinutes in (startHour * 60) until (endHour * 60) step step) {
+                                    val h = currentMinutes / 60
+                                    val m = currentMinutes % 60
+                                    val slotStart = LocalTime(h, m)
+                                    val endTotal = currentMinutes + step
+                                    val slotEnd = if (endTotal >= 24 * 60) LocalTime(23, 59) else LocalTime(endTotal / 60, endTotal % 60)
+                                    val startStr = "${if(h<10)"0$h" else h}:${if(m<10)"0$m" else m}"
 
-                                val isTaken = takenSlots.any { booking ->
-                                    if (booking.fieldId != field.id) return@any false
-                                    val s = booking.startDate.replace("Z", ""); val e = booking.endDate.replace("Z", "")
-                                    val bs = LocalDateTime.parse(s).time; val be = LocalDateTime.parse(e).time
-                                    slotStart < be && slotEnd > bs
-                                }
-                                val isSelected = selectedSlots.contains(field.id to slotStart)
-                                val slotColor = if (isTaken) Color.LightGray else if (isSelected) Color(0xFFFFD700) else RacingGreenLight
-                                val textColor = if (isSelected) Color.Black else Color.White
+                                    val isTaken = takenSlots.any { booking ->
+                                        if (booking.fieldId != field.id) return@any false
+                                        val s = booking.startDate.replace("Z", ""); val e = booking.endDate.replace("Z", "")
+                                        val bs = LocalDateTime.parse(s).time; val be = LocalDateTime.parse(e).time
+                                        slotStart < be && slotEnd > bs
+                                    }
+                                    val isSelected = selectedSlots.contains(field.id to slotStart)
+                                    val slotColor = if (isTaken) Color.LightGray else if (isSelected) Color(0xFFFFD700) else RacingGreenLight
+                                    val textColor = if (isSelected) Color.Black else Color.White
 
-                                Column(Modifier.padding(end = 4.dp).width(85.dp)) {
-                                    Text(startStr, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    Spacer(Modifier.height(4.dp))
-                                    Button(
-                                        onClick = { if (!isTaken) { val key = field.id to slotStart; selectedSlots = if (isSelected) selectedSlots - key else selectedSlots + key } },
-                                        colors = ButtonDefaults.buttonColors(containerColor = slotColor),
-                                        shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                                        enabled = !isTaken
-                                    ) { Text(
-                                        text = "${if (field.price % 1 == 0.0) field.price.toInt() else field.price} zł",
+                                    Column(Modifier.padding(end = 4.dp).width(85.dp)) {
+                                        Text(startStr, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                        Spacer(Modifier.height(4.dp))
+                                        Button(
+                                            onClick = { if (!isTaken) { val key = field.id to slotStart; selectedSlots = if (isSelected) selectedSlots - key else selectedSlots + key } },
+                                            colors = ButtonDefaults.buttonColors(containerColor = slotColor),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                                            enabled = !isTaken
+                                        ) { Text(
+                                            text = "${if (field.price % 1 == 0.0) field.price.toInt() else field.price} zł",
 
-                                        style = MaterialTheme.typography.labelSmall,
+                                            style = MaterialTheme.typography.labelSmall,
 
-                                        color = if (isSelected) Color.Black else Color.White
-                                    ) }
+                                            color = if (isSelected) Color.Black else Color.White
+                                        ) }
+                                    }
                                 }
                             }
                         }

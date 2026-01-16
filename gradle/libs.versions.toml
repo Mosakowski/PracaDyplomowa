@@ -1,15 +1,15 @@
 [versions]
-agp = "8.11.2"
-android-compileSdk = "36"
+agp = "8.5.2" #zmienione z 8.11.2 bo nieintellyj sie zesral, trzeba bedzie wrocic
+android-compileSdk = "34" #zmienione z 36
 android-minSdk = "24"
-android-targetSdk = "36"
-androidx-activity = "1.11.0"
+android-targetSdk = "34"  #zmienione z 36
+androidx-activity = "1.9.3" #zmienione z 1.11.0
 androidx-appcompat = "1.7.1"
 androidx-core = "1.17.0"
 androidx-espresso = "3.7.0"
-androidx-lifecycle = "2.9.5"
+androidx-lifecycle = "2.8.4" # zmienione z 2.9.5
 androidx-testExt = "1.3.0"
-composeMultiplatform = "1.9.1"
+composeMultiplatform = "1.7.0" #zmienione z 1.9.1
 junit = "4.13.2"
 kotlin = "2.2.20"
 ktor = "3.3.1"

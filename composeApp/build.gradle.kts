@@ -79,6 +79,15 @@ if (isAndroidAvailable) {
             versionCode = 1
             versionName = "1.0"
         }
+
+        sourceSets {
+            getByName("main") {
+                manifest.srcFile("src/androidMain/AndroidManifest.xml")
+                res.srcDirs("src/androidMain/res")
+                resources.srcDirs("src/commonMain/resources")
+            }
+        }
+
         packaging {
             resources {
                 excludes += "/META-INF/{AL2.0,LGPL2.1}"

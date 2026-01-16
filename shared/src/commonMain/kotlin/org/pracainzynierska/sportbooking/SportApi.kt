@@ -22,6 +22,7 @@ class SportApi {
 
     //zmienione
     private val baseUrl = "https://rezerwacjaboisk.onrender.com/api"
+    //private val baseUrl = "http://localhost:8080/api"
 
     // 1. Pobieranie boisk
     suspend fun getFacilities(): List<FacilityDto> {

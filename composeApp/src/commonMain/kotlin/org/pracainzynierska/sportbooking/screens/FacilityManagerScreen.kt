@@ -13,8 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -40,6 +38,10 @@ fun FacilityManagerScreen(
     var stats by remember { mutableStateOf<FacilityStatsDto?>(null) }
     var selectedDate by remember { mutableStateOf(LocalDate(2026, 1, 13)) }
     var refreshTrigger by remember { mutableStateOf(0) }
+
+    // 👇 NOWE: Flaga ładowania
+    var isLoading by remember { mutableStateOf(false) }
+
     var recentBookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
     var bookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
     var selectedSlotsToBlock by remember { mutableStateOf<Set<Pair<Int, LocalTime>>>(emptySet()) }
@@ -48,18 +50,27 @@ fun FacilityManagerScreen(
     var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(refreshTrigger, selectedDate) {
+        // 👇 RESETUJEMY DANE I WŁĄCZAMY ŁADOWANIE
+        isLoading = true
+        bookings = emptyList() // Czyścimy stare, żeby nie myliły
+        selectedSlotsToBlock = emptySet()
+
         try {
             if (stats == null || refreshTrigger > 0) stats = api.getFacilityStats(currentUser.userId, facility.id)
             bookings = api.getOwnerBookings(currentUser.userId, facility.id, selectedDate.toString())
             recentBookings = api.getRecentBookings(currentUser.userId, facility.id)
-            selectedSlotsToBlock = emptySet()
-        } catch (e: Exception) { println(e) }
+        } catch (e: Exception) {
+            println(e)
+        } finally {
+            // 👇 WYŁĄCZAMY ŁADOWANIE (niezależnie czy sukces czy błąd)
+            isLoading = false
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.  ArrowBack, null) }
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text("Panel Zarządzania", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
@@ -106,40 +117,48 @@ fun FacilityManagerScreen(
             }
 
             Text("Grafik wizualny", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
-            facility.fields.forEach { field ->
-                Text(field.name, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 16.dp))
-                Box(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                    val scrollState = rememberScrollState()
-                    Row(Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 16.dp)) {
-                        val startHour = facility.openingTime.split(":").first().toInt()
-                        val endHour = facility.closingTime.split(":").first().toInt()
-                        val step = field.minSlotDuration
-                        for (currentMinutes in (startHour * 60) until (endHour * 60) step step) {
-                            val h = currentMinutes / 60
-                            val m = currentMinutes % 60
-                            val slotStart = LocalTime(h, m)
-                            val existingBooking = bookings.find { booking ->
-                                if (booking.fieldId != field.id) return@find false
-                                val bs = try { LocalTime.parse(booking.startDate) } catch(e:Exception) { LocalTime(0,0) }
-                                val be = try { LocalTime.parse(booking.endDate) } catch(e:Exception) { LocalTime(0,0) }
-                                slotStart >= bs && slotStart < be
-                            }
-                            val isTechnical = existingBooking?.status == "TECHNICAL"
-                            val isClient = existingBooking != null && !isTechnical
-                            val isSelectedToBlock = selectedSlotsToBlock.contains(field.id to slotStart)
-                            val bgColor = when { isTechnical -> Color.DarkGray; isClient -> Color(0xFF1976D2); isSelectedToBlock -> ErrorRed; else -> Color.White }
 
-                            Column(Modifier.padding(end = 4.dp).width(85.dp)) {
-                                Text("${if(h<10)"0$h" else h}:${if(m<10)"0$m" else m}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                Spacer(Modifier.height(4.dp))
-                                Button(
-                                    onClick = { if (existingBooking != null) bookingToManage = existingBooking else { val key = field.id to slotStart; selectedSlotsToBlock = if (isSelectedToBlock) selectedSlotsToBlock - key else selectedSlotsToBlock + key } },
-                                    colors = ButtonDefaults.buttonColors(containerColor = bgColor), shape = RoundedCornerShape(4.dp), modifier = Modifier.height(50.dp).fillMaxWidth(),
-                                    border = if (existingBooking == null && !isSelectedToBlock) BorderStroke(1.dp, RacingGreen) else null
-                                ) {
-                                    if (isTechnical) Icon(Icons.Default.Build, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    else if (isClient) Text(existingBooking!!.clientName.take(6)+"..", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                                    else if (isSelectedToBlock) Icon(Icons.Default.Lock, null, tint = Color.White)
+            // 👇 NOWE: Obsługa Spinnera. Jeśli ładuje - kręcioł. Jeśli nie - lista.
+            if (isLoading) {
+                Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = RacingGreen)
+                }
+            } else {
+                facility.fields.forEach { field ->
+                    Text(field.name, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 16.dp))
+                    Box(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                        val scrollState = rememberScrollState()
+                        Row(Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 16.dp)) {
+                            val startHour = facility.openingTime.split(":").first().toInt()
+                            val endHour = facility.closingTime.split(":").first().toInt()
+                            val step = field.minSlotDuration
+                            for (currentMinutes in (startHour * 60) until (endHour * 60) step step) {
+                                val h = currentMinutes / 60
+                                val m = currentMinutes % 60
+                                val slotStart = LocalTime(h, m)
+                                val existingBooking = bookings.find { booking ->
+                                    if (booking.fieldId != field.id) return@find false
+                                    val bs = try { LocalTime.parse(booking.startDate) } catch(e:Exception) { LocalTime(0,0) }
+                                    val be = try { LocalTime.parse(booking.endDate) } catch(e:Exception) { LocalTime(0,0) }
+                                    slotStart >= bs && slotStart < be
+                                }
+                                val isTechnical = existingBooking?.status == "TECHNICAL"
+                                val isClient = existingBooking != null && !isTechnical
+                                val isSelectedToBlock = selectedSlotsToBlock.contains(field.id to slotStart)
+                                val bgColor = when { isTechnical -> Color.DarkGray; isClient -> Color(0xFF1976D2); isSelectedToBlock -> ErrorRed; else -> Color.White }
+
+                                Column(Modifier.padding(end = 4.dp).width(85.dp)) {
+                                    Text("${if(h<10)"0$h" else h}:${if(m<10)"0$m" else m}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Spacer(Modifier.height(4.dp))
+                                    Button(
+                                        onClick = { if (existingBooking != null) bookingToManage = existingBooking else { val key = field.id to slotStart; selectedSlotsToBlock = if (isSelectedToBlock) selectedSlotsToBlock - key else selectedSlotsToBlock + key } },
+                                        colors = ButtonDefaults.buttonColors(containerColor = bgColor), shape = RoundedCornerShape(4.dp), modifier = Modifier.height(50.dp).fillMaxWidth(),
+                                        border = if (existingBooking == null && !isSelectedToBlock) BorderStroke(1.dp, RacingGreen) else null
+                                    ) {
+                                        if (isTechnical) Icon(Icons.Default.Build, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        else if (isClient) Text(existingBooking!!.clientName.take(6)+"..", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                        else if (isSelectedToBlock) Icon(Icons.Default.Lock, null, tint = Color.White)
+                                    }
                                 }
                             }
                         }
@@ -149,7 +168,7 @@ fun FacilityManagerScreen(
 
             Spacer(Modifier.height(16.dp))
             Divider()
-            Text("⏱️ Ostatnia aktywność (Nowe rezerwacje)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
+            Text("Ostatnia aktywność", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
             if (recentBookings.isEmpty()) { Text("Brak nowej aktywności.", Modifier.padding(16.dp), color = Color.Gray) }
             else { recentBookings.forEach { booking -> RecentBookingCard(booking); Spacer(Modifier.height(8.dp)) } }
             Spacer(Modifier.height(80.dp))
