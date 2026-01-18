@@ -36,7 +36,7 @@ fun FacilityManagerScreen(
     onBack: () -> Unit
 ) {
     var stats by remember { mutableStateOf<FacilityStatsDto?>(null) }
-    var selectedDate by remember { mutableStateOf(LocalDate(2026, 1, 13)) }
+    var selectedDate by remember { mutableStateOf(LocalDate(2026, 1, 20)) }
     var refreshTrigger by remember { mutableStateOf(0) }
 
     // 👇 NOWE: Flaga ładowania
@@ -92,7 +92,7 @@ fun FacilityManagerScreen(
             Spacer(Modifier.height(16.dp))
             Divider()
 
-            val daysList = remember(facility.maxDaysAdvance) { (0 until facility.maxDaysAdvance).map { LocalDate(2026, 1, 13).plus(DatePeriod(days = it)) } }
+            val daysList = remember(facility.maxDaysAdvance) { (0 until facility.maxDaysAdvance).map { LocalDate(2026, 1, 20).plus(DatePeriod(days = it)) } }
             fun getPolishDayAbbr(day: DayOfWeek): String = when(day) { DayOfWeek.MONDAY -> "PON."; DayOfWeek.TUESDAY -> "WT."; DayOfWeek.WEDNESDAY -> "ŚR."; DayOfWeek.THURSDAY -> "CZW."; DayOfWeek.FRIDAY -> "PT."; DayOfWeek.SATURDAY -> "SOB."; DayOfWeek.SUNDAY -> "ND."; else -> day.name.take(3) }
             fun getPolishMonthAbbr(month: Month): String = when(month) { Month.JANUARY -> "Sty"; Month.FEBRUARY -> "Lut"; Month.MARCH -> "Mar"; Month.APRIL -> "Kwi"; Month.MAY -> "Maj"; Month.JUNE -> "Cze"; Month.JULY -> "Lip"; Month.AUGUST -> "Sie"; Month.SEPTEMBER -> "Wrz"; Month.OCTOBER -> "Paź"; Month.NOVEMBER -> "Lis"; Month.DECEMBER -> "Gru"; else -> month.name.take(3) }
 

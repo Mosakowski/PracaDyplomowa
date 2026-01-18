@@ -35,7 +35,7 @@ fun SchedulerScreen(
     userId: Int,
     onBack: () -> Unit
 ) {
-    val today = remember { LocalDate(2026, 1, 13) }
+    val today = remember { LocalDate(2026, 1, 20) }
     var selectedDate by remember { mutableStateOf(today) }
     var takenSlots by remember { mutableStateOf<List<BookingDto>>(emptyList()) }
     var refreshTrigger by remember { mutableStateOf(0) }
