@@ -47,6 +47,10 @@ kotlin {
             }
         }
 
+        val wasmJsMain by getting {
+
+        }
+
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)

@@ -59,7 +59,7 @@ fun App() {
                             Icon(Icons.Default.SportsSoccer, null, tint = RacingGreen)
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text("SportBooking", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = RacingGreen)
+                                Text("RezerwacjaBoisk", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = RacingGreen)
                                 if (currentUser != null) {
                                     Text("Witaj, ${currentUser?.name}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                                 }
