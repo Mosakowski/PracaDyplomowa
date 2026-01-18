@@ -13,7 +13,7 @@ RUN chmod +x ./gradlew
 RUN ./gradlew :server:installDist --no-daemon
 
 # 2. Budujemy Frontend (Wasm)
-RUN ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon
+RUN ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon -Dorg.gradle.jvmargs="-Xmx350m -XX:+UseSerialGC" --stacktrace
 
 # ETAP 2: Uruchomienie (Eclipse Temurin)
 FROM eclipse-temurin:21-jre
