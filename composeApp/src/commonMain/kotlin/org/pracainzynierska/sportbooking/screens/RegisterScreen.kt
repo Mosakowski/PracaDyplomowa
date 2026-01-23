@@ -30,7 +30,7 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var isOwner by remember { mutableStateOf(false) }
 
-    // 👇 NOWA ZMIENNA: Stan błędu dla emaila
+    //  Stan błędu dla emaila
     var emailError by remember { mutableStateOf(false) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
