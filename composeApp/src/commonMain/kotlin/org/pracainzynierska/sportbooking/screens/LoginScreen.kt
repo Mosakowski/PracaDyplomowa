@@ -72,7 +72,7 @@ fun LoginScreen(
                     } catch (e: Exception) {
                         errorMessage = "Błąd: Nieprawidłowe dane"
                     } finally {
-                        isLoading = false
+                        isLoading = false //c
                     }
                 }
             },
