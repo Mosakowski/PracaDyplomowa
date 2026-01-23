@@ -30,12 +30,15 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var isOwner by remember { mutableStateOf(false) }
 
+    // 👇 NOWA ZMIENNA: Stan błędu dla emaila
+    var emailError by remember { mutableStateOf(false) }
+
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), // Dodałem padding dla estetyki
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -54,11 +57,24 @@ fun RegisterScreen(
         )
         Spacer(Modifier.height(16.dp))
 
+        //  ZMODYFIKOWANE POLE EMAIL
         OutlinedTextField(
-            value = email, onValueChange = { email = it },
+            value = email,
+            onValueChange = {
+                email = it
+                emailError = false // Resetujemy błąd, gdy użytkownik zaczyna poprawiać
+                errorMessage = null
+            },
             label = { Text("Adres Email") },
             leadingIcon = { Icon(Icons.Default.Email, null) },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = emailError, // Zapala czerwoną ramkę
+            supportingText = {
+                if (emailError) {
+                    Text("Niepoprawny format adresu email", color = MaterialTheme.colorScheme.error)
+                }
+            }
         )
         Spacer(Modifier.height(16.dp))
 
@@ -102,12 +118,22 @@ fun RegisterScreen(
             onClick = {
                 if (isProcessing) return@Button
 
-                if (password != confirmPassword) {
-                    errorMessage = "Hasła nie są identyczne!"
-                    return@Button
-                }
+                // 1. Sprawdź puste pola
                 if (email.isBlank() || password.isBlank() || name.isBlank()) {
                     errorMessage = "Wypełnij wszystkie pola."
+                    return@Button
+                }
+
+                // 2.  SPRAWDZENIE EMAILA
+                if (!isValidEmail(email)) {
+                    emailError = true
+                    errorMessage = "Podaj poprawny adres email."
+                    return@Button
+                }
+
+                // 3. Sprawdź hasła
+                if (password != confirmPassword) {
+                    errorMessage = "Hasła nie są identyczne!"
                     return@Button
                 }
 
@@ -144,4 +170,9 @@ fun RegisterScreen(
             Text("Masz już konto? Zaloguj się", color = RacingGreen)
         }
     }
+}
+
+fun isValidEmail(email: String): Boolean {
+    val emailRegex = "[a-zA-Z0-9\\+\\.\\_\\%\\-\\+]{1,256}@[a-zA-Z0-9][a-zA-Z0-9\\-]{0,64}(\\.[a-zA-Z0-9][a-zA-Z0-9\\-]{0,25})+"
+    return email.matches(emailRegex.toRegex())
 }
