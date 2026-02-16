@@ -59,7 +59,8 @@ data class BookingDto(
 data class CreateBookingRequest(
     val fieldId: Int,
     val startIso: String, // np. "2024-06-01T14:00"
-    val endIso: String    // np. "2024-06-01T15:00"
+    val endIso: String,    // np. "2024-06-01T15:00"
+    val manualClientName: String? = null //dla recznej rezerwacji przez wlasciciela
 )
 
 @Serializable

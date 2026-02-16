@@ -83,7 +83,7 @@ fun Route.bookingRoutes() {
 
                 if (isAvailable) {
                     // 5. Zapisujemy w bazie
-                    val bookingId = repo.createBooking(userIdHeader, request.fieldId, startTs, endTs)
+                    val bookingId = repo.createBooking(userIdHeader, request.fieldId, startTs, endTs, request.manualClientName)
                     call.respond(HttpStatusCode.Created, mapOf("id" to bookingId.toString(), "message" to "Zarezerwowano"))
                 } else {
                     call.respond(HttpStatusCode.Conflict, "Termin jest zajęty")

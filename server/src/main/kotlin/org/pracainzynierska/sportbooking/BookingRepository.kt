@@ -29,7 +29,7 @@ class BookingRepository {
     }
 
     // 2. Zapisywanie rezerwacji (POPRAWIONE)
-    suspend fun createBooking(userId: Int, fieldId: Int, start: Long, end: Long): Int = dbQuery {
+    suspend fun createBooking(userId: Int, fieldId: Int, start: Long, end: Long, manualClientName: String? = null): Int = dbQuery {
         val startInstant = Instant.ofEpochMilli(start)
         val endInstant = Instant.ofEpochMilli(end)
 
@@ -49,6 +49,7 @@ class BookingRepository {
             it[Bookings.end] = endInstant
             it[Bookings.status] = BookingStatus.WAITING
             it[Bookings.price] = totalPrice
+            it[Bookings.manualClientName] = manualClientName
         }[Bookings.id]
     }
 
@@ -237,7 +238,7 @@ class BookingRepository {
             price = row[Bookings.price].toDouble(),
             startDate = timeFormatter.format(row[Bookings.start]), // "14:00"
             endDate = timeFormatter.format(row[Bookings.end]),     // "15:30"
-            clientName = row[Users.name],
+            clientName = row[Bookings.manualClientName] ?: row[Users.name],
             clientEmail = row[Users.email],
             bookingTime = dateTimeFormatter.format(row[Bookings.createdAt]),
             rawDate = dateFormatter.format(row[Bookings.start]) // "2026-01-13"

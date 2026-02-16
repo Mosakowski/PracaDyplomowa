@@ -27,8 +27,9 @@ sealed class Screen {
     data class Details(val facility: FacilityDto) : Screen()
     data class Scheduler(val facility: FacilityDto) : Screen()
     data class Manager(val facility: FacilityDto) : Screen()
-    // 👇 1. NOWY EKRAN ADMINA
+    data object OwnerDashboard : Screen()
     data object Admin : Screen()
+    data class OwnerFacilityDetails(val facility: FacilityDto) : Screen()
 }
 
 // --- GŁÓWNA APLIKACJA ---
@@ -68,8 +69,8 @@ fun App() {
 
                         // --- IKONY NAWIGACJI ---
                         if (currentUser != null) {
-                            Row {
-                                // 👇 1. SPECJALNA IKONA TYLKO DLA ADMINA
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                //  1. SPECJALNA IKONA TYLKO DLA ADMINA
                                 if (currentUser?.role == "ADMIN") {
                                     IconButton(onClick = { currentScreen = Screen.Admin }) {
                                         // Ikonka "Manage Accounts" lub "Settings"
@@ -77,7 +78,21 @@ fun App() {
                                     }
                                 }
 
-                                // 👇 2. IKONY STANDARDOWE (DLA KAŻDEGO, RÓWNIEŻ DLA ADMINA)
+                                // 1.2 SPECJALNA IKONA TYLKO DLA WLASCICIELA BOISKA
+                                if (currentUser?.role == "FIELD_OWNER") {
+                                     TextButton(
+                                         onClick = {
+                                             currentScreen = Screen.OwnerDashboard
+                                         },
+                                         colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF1565C0)),
+                                     ){
+                                         Text("PANEL WŁAŚCICIELA", fontWeight = FontWeight.Bold)
+                                     }
+                                }
+
+
+
+                                //  2. IKONY STANDARDOWE
                                 IconButton(onClick = { currentScreen = Screen.List }) {
                                     Icon(Icons.Default.Home, "Obiekty", tint = RacingGreen)
                                 }
@@ -131,7 +146,6 @@ fun App() {
                                 currentUser = currentUser,
                                 onNavigateToScheduler = { currentScreen = Screen.Scheduler(screen.facility) },
                                 onBack = { currentScreen = Screen.List },
-                                onNavigateToManager = { currentScreen = Screen.Manager(screen.facility) }
                             )
                         }
                         is Screen.Scheduler -> {
@@ -152,6 +166,29 @@ fun App() {
                                     currentScreen = Screen.Login
                                 })
                             } else currentScreen = Screen.List
+                        }
+
+                        is Screen.OwnerDashboard -> {
+                            if (currentUser != null) {
+                                OwnerDashboardScreen(
+                                    api = api,
+                                    currentUser = currentUser!!,
+                                    onNavigateToManager = { facility ->
+                                        currentScreen = Screen.OwnerFacilityDetails(facility)
+                                    }
+                                )
+                            } else currentScreen = Screen.Login
+                        }
+
+                        is Screen.OwnerFacilityDetails -> {
+                            if (currentUser != null) {
+                                FacilityDetailsOwnerScreen(
+                                    facility = screen.facility,
+                                    currentUser = currentUser!!,
+                                    onNavigateToManager = { currentScreen = Screen.Manager(screen.facility) }, // Stąd idziemy do panelu
+                                    onBack = { currentScreen = Screen.OwnerDashboard } // Powrót na pulpit właściciela
+                                )
+                            } else currentScreen = Screen.Login
                         }
                     }
                 }

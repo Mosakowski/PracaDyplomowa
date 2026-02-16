@@ -21,8 +21,8 @@ class SportApi {
 
 
     //zmienione
-    private val baseUrl = "https://rezerwacjaboisk.onrender.com/api"
-    //private val baseUrl = "http://localhost:8080/api"
+    //private val baseUrl = "https://rezerwacjaboisk.onrender.com/api"
+    private val baseUrl = "http://localhost:8080/api"
 
     // 1. Pobieranie boisk
     suspend fun getFacilities(): List<FacilityDto> {
@@ -201,6 +201,10 @@ class SportApi {
 
     suspend fun getAllFacilitiesAdmin(): List<FacilityAdminDto> {
         return client.get("$baseUrl/admin/facilities").body()
+    }
+
+    suspend fun getMyFacilities(ownerId: Int): List<FacilityDto> {
+        return client.get("$baseUrl/facilities/owner/$ownerId").body()
     }
 
     suspend fun deleteFacilityAdmin(id: Int): Boolean {

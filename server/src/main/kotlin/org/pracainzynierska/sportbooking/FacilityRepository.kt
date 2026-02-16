@@ -72,6 +72,48 @@ class FacilityRepository {
             facility.copy(fields = fieldsMap[facility.id] ?: emptyList())
         }
     }
+
+    suspend fun getByOwnerId(ownerId: Int): List<FacilityDto> = dbQuery {
+        // 1. Pobieramy obiekty należące do właściciela
+        val facilities = Facilities.selectAll().where { Facilities.userId eq ownerId }.map { row ->
+            FacilityDto(
+                id = row[Facilities.id],
+                name = row[Facilities.name],
+                location = row[Facilities.location],
+                description = row[Facilities.description],
+                fields = emptyList(), // Za chwilę to nadpiszemy
+                openingTime = row[Facilities.openingTime],
+                closingTime = row[Facilities.closingTime],
+                maxDaysAdvance = row[Facilities.maxDaysAdvance],
+                ownerId = row[Facilities.userId]
+            )
+        }
+
+        // Zabezpieczenie: Jeśli właściciel nie dodał jeszcze żadnego obiektu, od razu zwracamy pustą listę
+        if (facilities.isEmpty()) return@dbQuery emptyList()
+
+        // Wyciągamy listę ID obiektów tego właściciela (np. [5, 12, 18])
+        val facilityIds = facilities.map { it.id }
+
+        // 2. Pobieramy boiska, ale TYLKO dla obiektów z naszej listy (używamy 'inList')
+        val fieldsMap = Fields.selectAll().where { Fields.facilityId inList facilityIds }.map { row ->
+            val facilityId = row[Fields.facilityId]
+            val fieldDto = FieldDto(
+                id = row[Fields.id],
+                name = row[Fields.name],
+                type = row[Fields.fieldType].name,
+                price = row[Fields.pricePerSlot].toDouble(),
+                minSlotDuration = row[Fields.minSlotDuration]
+            )
+            facilityId to fieldDto
+        }.groupBy({ it.first }, { it.second })
+
+        // 3. Łączymy obiekty z ich boiskami i zwracamy gotową listę
+        facilities.map { facility ->
+            facility.copy(fields = fieldsMap[facility.id] ?: emptyList())
+        }
+    }
+
     suspend fun update(facilityId: Int, ownerId: Int, request: AddFacilityRequest): Boolean = dbQuery {
         val updatedRows = Facilities.update({ (Facilities.id eq facilityId) and (Facilities.userId eq ownerId) }) {
             it[name] = request.name

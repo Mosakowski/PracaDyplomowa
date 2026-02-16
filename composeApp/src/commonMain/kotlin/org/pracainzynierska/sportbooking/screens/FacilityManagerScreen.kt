@@ -36,7 +36,7 @@ fun FacilityManagerScreen(
     onBack: () -> Unit
 ) {
     var stats by remember { mutableStateOf<FacilityStatsDto?>(null) }
-    var selectedDate by remember { mutableStateOf(LocalDate(2026, 1, 25)) }
+    var selectedDate by remember { mutableStateOf(LocalDate(2026, 2, 16)) }
     var refreshTrigger by remember { mutableStateOf(0) }
 
     // 👇 NOWE: Flaga ładowania
@@ -92,7 +92,7 @@ fun FacilityManagerScreen(
             Spacer(Modifier.height(16.dp))
             Divider()
 
-            val daysList = remember(facility.maxDaysAdvance) { (0 until facility.maxDaysAdvance).map { LocalDate(2026, 1, 25).plus(DatePeriod(days = it)) } }
+            val daysList = remember(facility.maxDaysAdvance) { (0 until facility.maxDaysAdvance).map { LocalDate(2026, 2, 16).plus(DatePeriod(days = it)) } }
             fun getPolishDayAbbr(day: DayOfWeek): String = when(day) { DayOfWeek.MONDAY -> "PON."; DayOfWeek.TUESDAY -> "WT."; DayOfWeek.WEDNESDAY -> "ŚR."; DayOfWeek.THURSDAY -> "CZW."; DayOfWeek.FRIDAY -> "PT."; DayOfWeek.SATURDAY -> "SOB."; DayOfWeek.SUNDAY -> "ND."; else -> day.name.take(3) }
             fun getPolishMonthAbbr(month: Month): String = when(month) { Month.JANUARY -> "Sty"; Month.FEBRUARY -> "Lut"; Month.MARCH -> "Mar"; Month.APRIL -> "Kwi"; Month.MAY -> "Maj"; Month.JUNE -> "Cze"; Month.JULY -> "Lip"; Month.AUGUST -> "Sie"; Month.SEPTEMBER -> "Wrz"; Month.OCTOBER -> "Paź"; Month.NOVEMBER -> "Lis"; Month.DECEMBER -> "Gru"; else -> month.name.take(3) }
 
@@ -175,11 +175,99 @@ fun FacilityManagerScreen(
         }
 
         if (selectedSlotsToBlock.isNotEmpty()) {
+
+            // 👇 NOWE STANY DO OKIENKA (dodaj je tutaj, wewnątrz widoku)
+            var showManualBookingDialog by remember { mutableStateOf(false) }
+            var manualClientName by remember { mutableStateOf("") }
+
             Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = Color.White, shadowElevation = 16.dp) {
-                Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Wybrano slotów: ${selectedSlotsToBlock.size}")
-                    Button(onClick = { scope.launch { val requests = mergeSlotsToRequests(selectedSlotsToBlock, facility.fields, selectedDate.toString()); requests.forEach { req -> api.blockSlot(currentUser.userId, req) }; message = "Terminy zablokowane!"; selectedSlotsToBlock = emptySet(); refreshTrigger++ } }, colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)) { Text("ZABLOKUJ TERMINY") }
+                Column(Modifier.padding(16.dp)) {
+                    Text("Wybrano terminów: ${selectedSlotsToBlock.size}", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        // 1. STARY PRZYCISK: PRZERWA TECHNICZNA
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val requests = mergeSlotsToRequests(selectedSlotsToBlock, facility.fields, selectedDate.toString())
+                                    requests.forEach { req -> api.blockSlot(currentUser.userId, req) }
+                                    message = "Terminy zablokowane!"
+                                    selectedSlotsToBlock = emptySet()
+                                    refreshTrigger++
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("ZABLOKUJ (SERWIS)", style = MaterialTheme.typography.labelSmall) }
+
+                        Spacer(Modifier.width(8.dp))
+
+                        // 2. NOWY PRZYCISK: REZERWACJA RĘCZNA (TELEFON)
+                        Button(
+                            onClick = { showManualBookingDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = RacingGreen),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("DODAJ KLIENTA", style = MaterialTheme.typography.labelSmall) }
+                    }
                 }
+            }
+
+            // Wpisanie imienia klienta
+            if (showManualBookingDialog) {
+                AlertDialog(
+                    onDismissRequest = { showManualBookingDialog = false },
+                    title = { Text("Rezerwacja Manualna") },
+                    text = {
+                        Column {
+                            Text("Wpisz dane klienta z telefonu (np. Pan Romek):", style = MaterialTheme.typography.bodySmall)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = manualClientName,
+                                onValueChange = { manualClientName = it },
+                                label = { Text("Imię i nazwisko / Telefon") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    // 1. Zbieramy zaznaczone godziny w paczki (requesty)
+                                    val requests = mergeSlotsToRequests(selectedSlotsToBlock, facility.fields, selectedDate.toString())
+
+                                    // 2. Do każdej paczki dorzucamy imię naszego klienta!
+                                    val requestsWithClientName = requests.map { request ->
+                                        request.copy(manualClientName = manualClientName)
+                                    }
+
+                                    // 3. Wysyłamy do serwera.
+                                    // Używamy standardowego api.createBooking (bo to normalna rezerwacja)
+                                    try {
+                                        requestsWithClientName.forEach { req ->
+                                            api.createBooking(currentUser.userId, req)
+                                        }
+                                        message = "Zapisano klienta: $manualClientName"
+                                    } catch (e: Exception) {
+                                        message = "Błąd: ${e.message}"
+                                    }
+
+                                    // 4. Sprzątamy i odświeżamy
+                                    showManualBookingDialog = false
+                                    manualClientName = ""
+                                    selectedSlotsToBlock = emptySet()
+                                    refreshTrigger++ // To odświeży kalendarz!
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = RacingGreen)
+                        ) { Text("ZAPISZ") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showManualBookingDialog = false }) { Text("Anuluj") }
+                    }
+                )
             }
         }
     }

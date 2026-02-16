@@ -28,7 +28,6 @@ fun FacilitiesScreen(
 ) {
     var refreshTrigger by remember { mutableStateOf(0) }
     var facilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
-    var showAddDialog by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedSport by remember { mutableStateOf<String?>(null) }
@@ -63,9 +62,6 @@ fun FacilitiesScreen(
             ) {
                 Text("Znajdź obiekt", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-                if (currentUser != null && currentUser.role == "FIELD_OWNER") {
-                    FilledTonalButton(onClick = { showAddDialog = true }) { Text("+ Dodaj") }
-                }
             }
 
             OutlinedTextField(
@@ -107,8 +103,5 @@ fun FacilitiesScreen(
             }
         }
 
-        if (showAddDialog && currentUser != null) {
-            AddFacilityDialog(currentUser.userId, api, { showAddDialog = false }, { showAddDialog = false; refreshTrigger++ })
-        }
     }
 }

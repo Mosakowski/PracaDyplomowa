@@ -3,6 +3,7 @@ package org.pracainzynierska.sportbooking
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 import org.jetbrains.exposed.sql.javatime.CurrentTimestamp
+import org.pracainzynierska.sportbooking.Fields.nullable
 
 object Users : Table("users") {
     val id = integer("user_id").autoIncrement()
@@ -31,9 +32,6 @@ object Facilities : Table("facilities") {
     val name = varchar("name", 100)
     val location = varchar("location", 255)
     val description = text("description").nullable()
-
-    // NOWE KOLUMNY
-    // varchar(5) wystarczy na "22:30"
     val openingTime = varchar("opening_time", 5).default("08:00")
     val closingTime = varchar("closing_time", 5).default("22:00")
     // Ile dni w przód można rezerwować
@@ -47,13 +45,12 @@ object Fields : Table("fields") {
     val facilityId = integer("facility_id").references(Facilities.id)
     val name = varchar("name", 100)
 
-    // MIEŃ/DODAJ TĘ LINIĘ:
-    // Musimy jawnie podać klasę enuma (FieldType::class), żeby Exposed wiedział co robić
+    // trzeba jawnie podać klasę enuma (FieldType::class), żeby Exposed wiedział co robić
     val fieldType = enumerationByName("field_type", 20, FieldType::class)
 
     val pricePerSlot = decimal("price_per_slot", 10, 2)
-    // NOWA KOLUMNA (Minuty)
     val minSlotDuration = integer("min_slot_duration").default(60)
+
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -85,6 +82,7 @@ object Bookings : Table("bookings") {
     val price = decimal("price", 10, 2) // Cena za tę konkretną rezerwację
 
     val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+    val manualClientName = varchar("manual_client_name", 100).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

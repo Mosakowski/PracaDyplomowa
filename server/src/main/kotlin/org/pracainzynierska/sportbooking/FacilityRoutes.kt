@@ -15,6 +15,24 @@ fun Route.facilityRoutes() {
             call.respond(facilities)
         }
 
+        get("/owner/{id}") {
+            // 1. Wyciągamy {id} z adresu URL (np. /api/facilities/owner/5 -> id to 5)
+            val ownerIdStr = call.parameters["id"]
+            val ownerId = ownerIdStr?.toIntOrNull()
+
+            // 2. Zabezpieczenie: jeśli ktoś wpisał bzdury (np. /owner/abc), odrzucamy z błędem
+            if (ownerId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Niepoprawne ID właściciela")
+                return@get
+            }
+
+            // 3. Pytamy repozytorium o obiekty tylko dla tego jednego ID
+            val facilities = repo.getByOwnerId(ownerId)
+
+            // 4. Zwracamy listę do aplikacji mobilnej/webowej
+            call.respond(facilities)
+        }
+
         post {
             // 1. Sprawdzamy, kto dodaje (musi być zalogowany)
             val userIdHeader = call.request.header("X-User-Id")?.toIntOrNull()
