@@ -25,32 +25,49 @@ enum class UserRole{
     ADMIN, CLIENT, FIELD_OWNER
 }
 
+enum class FacilityRole { ADMIN, STAFF }
+enum class FieldStatus { ACTIVE, INACTIVE, MAINTENANCE }
+
 // tabela obiektów
 object Facilities : Table("facilities") {
     val id = integer("facility_id").autoIncrement()
-    val userId = integer("user_id").references(Users.id) // Wiążemy obiekt z użytkownikiem
+    val userId = integer("user_id").references(Users.id) // Główny właściciel
     val name = varchar("name", 100)
     val location = varchar("location", 255)
     val description = text("description").nullable()
-    val openingTime = varchar("opening_time", 5).default("08:00")
-    val closingTime = varchar("closing_time", 5).default("22:00")
-    // Ile dni w przód można rezerwować
-    val maxDaysAdvance = integer("max_days_advance").default(30)
-    // ...
+
+    // 👇 USUNĘLIŚMY STĄD openingTime, closingTime i maxDaysAdvance!
+
     override val primaryKey = PrimaryKey(id)
 }
 
+// --- NOWA TABELA: PRACOWNICY OBIEKTU ---
+object FacilityMembers : Table("facility_members") {
+    val id = integer("member_id").autoIncrement()
+    val facilityId = integer("facility_id").references(Facilities.id)
+    val userId = integer("user_id").references(Users.id)
+    val role = enumerationByName("role", 20, FacilityRole::class)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+
+// --- ZAKTUALIZOWANA TABELA BOISK ---
 object Fields : Table("fields") {
     val id = integer("field_id").autoIncrement()
     val facilityId = integer("facility_id").references(Facilities.id)
     val name = varchar("name", 100)
-
-    // trzeba jawnie podać klasę enuma (FieldType::class), żeby Exposed wiedział co robić
     val fieldType = enumerationByName("field_type", 20, FieldType::class)
-
     val pricePerSlot = decimal("price_per_slot", 10, 2)
     val minSlotDuration = integer("min_slot_duration").default(60)
+    val description = text("description").nullable()
+    val status = enumerationByName("status", 20, FieldStatus::class).default(FieldStatus.ACTIVE)
+    val photoUrl = varchar("photo_url", 500).nullable() // Link do zdjęcia
+    val maxDaysAdvance = integer("max_days_advance").default(30)
+    val cancellationHours = integer("cancellation_hours").default(24) // Na ile h przed można anulować
 
+    // JSON zapisany jako tekst. Tutaj będziemy trzymać Map<DayOfWeekIso, DaySchedule>
+    val weeklySchedule = text("weekly_schedule").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

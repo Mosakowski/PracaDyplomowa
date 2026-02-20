@@ -16,7 +16,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import org.pracainzynierska.sportbooking.theme.*
 import org.pracainzynierska.sportbooking.screens.*
-import org.pracainzynierska.sportbooking.FacilityDto
 
 // --- DEFINICJA NAWIGACJI ---
 sealed class Screen {
@@ -27,8 +26,8 @@ sealed class Screen {
     data class Details(val facility: FacilityDto) : Screen()
     data class Scheduler(val facility: FacilityDto) : Screen()
     data class Manager(val facility: FacilityDto) : Screen()
-    data object OwnerDashboard : Screen()
     data object Admin : Screen()
+    data object OwnerMain : Screen()
     data class OwnerFacilityDetails(val facility: FacilityDto) : Screen()
 }
 
@@ -46,6 +45,8 @@ fun App() {
             Column(Modifier.fillMaxSize()) {
 
                 // --- 1. NAGŁÓWEK (HEADER) ---
+                // UWAGA: Kiedy Właściciel jest w OwnerMainScreen, ten górny pasek nadal tu jest.
+                // Będziemy mogli go w przyszłości ukryć dla właściciela, ale na razie niech zostanie.
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surface,
@@ -70,29 +71,23 @@ fun App() {
                         // --- IKONY NAWIGACJI ---
                         if (currentUser != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                //  1. SPECJALNA IKONA TYLKO DLA ADMINA
+
                                 if (currentUser?.role == "ADMIN") {
                                     IconButton(onClick = { currentScreen = Screen.Admin }) {
-                                        // Ikonka "Manage Accounts" lub "Settings"
                                         Icon(Icons.Default.ManageAccounts, "Panel Admina", tint = ErrorRed)
                                     }
                                 }
 
-                                // 1.2 SPECJALNA IKONA TYLKO DLA WLASCICIELA BOISKA
+                                // Przycisk kieruje teraz do nowej Skorupy (OwnerMain)
                                 if (currentUser?.role == "FIELD_OWNER") {
-                                     TextButton(
-                                         onClick = {
-                                             currentScreen = Screen.OwnerDashboard
-                                         },
-                                         colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF1565C0)),
-                                     ){
-                                         Text("PANEL WŁAŚCICIELA", fontWeight = FontWeight.Bold)
-                                     }
+                                    TextButton(
+                                        onClick = { currentScreen = Screen.OwnerMain },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF1565C0)),
+                                    ){
+                                        Text("PANEL WŁAŚCICIELA", fontWeight = FontWeight.Bold)
+                                    }
                                 }
 
-
-
-                                //  2. IKONY STANDARDOWE
                                 IconButton(onClick = { currentScreen = Screen.List }) {
                                     Icon(Icons.Default.Home, "Obiekty", tint = RacingGreen)
                                 }
@@ -119,27 +114,33 @@ fun App() {
                             api = api,
                             onLoginSuccess = { user ->
                                 currentUser = user
-                                // 👇 ZMIANA: Admin idzie tam gdzie wszyscy (na Listę), nie do panelu
-                                currentScreen = Screen.List
+                                // Rozwidlenie po logowaniu!
+                                if (user.role == "FIELD_OWNER") {
+                                    currentScreen = Screen.OwnerMain // Właściciel ląduje u siebie
+                                } else {
+                                    currentScreen = Screen.List // Klient leci do listy obiektów
+                                }
                             },
                             onNavigateToRegister = { currentScreen = Screen.Register }
                         )
 
-                        // ... Reszta ekranów bez zmian (Register, List, Details, etc.) ...
                         is Screen.Register -> RegisterScreen(
                             api = api,
                             onRegisterSuccess = { currentScreen = Screen.Login },
                             onNavigateToLogin = { currentScreen = Screen.Login }
                         )
+
                         is Screen.List -> FacilitiesScreen(
                             api = api,
                             currentUser = currentUser,
                             onNavigateToDetails = { facility -> currentScreen = Screen.Details(facility) }
                         )
+
                         is Screen.MyBookings -> {
                             if (currentUser != null) MyBookingsScreen(api, currentUser!!.userId)
                             else currentScreen = Screen.Login
                         }
+
                         is Screen.Details -> {
                             FacilityDetailsScreen(
                                 facility = screen.facility,
@@ -148,45 +149,52 @@ fun App() {
                                 onBack = { currentScreen = Screen.List },
                             )
                         }
+
                         is Screen.Scheduler -> {
                             if (currentUser != null) SchedulerScreen(screen.facility, api, currentUser!!.userId, { currentScreen = Screen.Details(screen.facility) })
                             else currentScreen = Screen.Login
                         }
+
+                        // Ten menedżer kalendarza na razie zostaje tu globalnie
                         is Screen.Manager -> {
                             if (currentUser != null) FacilityManagerScreen(screen.facility, api, currentUser!!, { currentScreen = Screen.Details(screen.facility) })
                             else currentScreen = Screen.Login
                         }
 
-                        // Ekran Admina
                         is Screen.Admin -> {
                             if (currentUser?.role == "ADMIN") {
                                 AdminPanelScreen(onLogout = {
-                                    // Kliknięcie wyloguj wewnątrz panelu (opcjonalne, bo jest w headerze)
                                     currentUser = null
                                     currentScreen = Screen.Login
                                 })
                             } else currentScreen = Screen.List
                         }
 
-                        is Screen.OwnerDashboard -> {
-                            if (currentUser != null) {
-                                OwnerDashboardScreen(
+                        // Rejestrujemy naszą nową Skorupę (OwnerMainScreen)
+                        is Screen.OwnerMain -> {
+                            if (currentUser != null && currentUser!!.role == "FIELD_OWNER") {
+                                OwnerMainScreen(
                                     api = api,
                                     currentUser = currentUser!!,
-                                    onNavigateToManager = { facility ->
+                                    onLogout = {
+                                        currentUser = null
+                                        currentScreen = Screen.Login
+                                    },
+                                    onNavigateToFacilityDetails = { facility ->
                                         currentScreen = Screen.OwnerFacilityDetails(facility)
                                     }
                                 )
                             } else currentScreen = Screen.Login
                         }
 
+                        // Ten ekran będziemy za chwilę przenosić do środka OwnerMainScreen
                         is Screen.OwnerFacilityDetails -> {
                             if (currentUser != null) {
                                 FacilityDetailsOwnerScreen(
                                     facility = screen.facility,
                                     currentUser = currentUser!!,
-                                    onNavigateToManager = { currentScreen = Screen.Manager(screen.facility) }, // Stąd idziemy do panelu
-                                    onBack = { currentScreen = Screen.OwnerDashboard } // Powrót na pulpit właściciela
+                                    onNavigateToManager = { currentScreen = Screen.Manager(screen.facility) },
+                                    onBack = { currentScreen = Screen.OwnerMain } // Wróć do skorupy
                                 )
                             } else currentScreen = Screen.Login
                         }

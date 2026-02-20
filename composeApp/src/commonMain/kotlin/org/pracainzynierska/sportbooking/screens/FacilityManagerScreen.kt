@@ -26,7 +26,6 @@ import org.pracainzynierska.sportbooking.components.RecentBookingCard
 import org.pracainzynierska.sportbooking.components.StatsCard
 import org.pracainzynierska.sportbooking.theme.ErrorRed
 import org.pracainzynierska.sportbooking.theme.RacingGreen
-import org.pracainzynierska.sportbooking.utils.mergeSlotsToRequests
 
 @Composable
 fun FacilityManagerScreen(
@@ -35,25 +34,24 @@ fun FacilityManagerScreen(
     currentUser: AuthResponse,
     onBack: () -> Unit
 ) {
+    // Statystyki
     var stats by remember { mutableStateOf<FacilityStatsDto?>(null) }
+
+    // Czas i Ładowanie
     var selectedDate by remember { mutableStateOf(LocalDate(2026, 2, 16)) }
     var refreshTrigger by remember { mutableStateOf(0) }
-
-    // 👇 NOWE: Flaga ładowania
     var isLoading by remember { mutableStateOf(false) }
 
+    // Dane z bazy
     var recentBookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
     var bookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
-    var selectedSlotsToBlock by remember { mutableStateOf<Set<Pair<Int, LocalTime>>>(emptySet()) }
-    var bookingToManage by remember { mutableStateOf<OwnerBookingDto?>(null) }
-    val scope = rememberCoroutineScope()
-    var message by remember { mutableStateOf<String?>(null) }
+
+    // Zakładki Boisk
+    var selectedTabIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(refreshTrigger, selectedDate) {
-        // 👇 RESETUJEMY DANE I WŁĄCZAMY ŁADOWANIE
         isLoading = true
-        bookings = emptyList() // Czyścimy stare, żeby nie myliły
-        selectedSlotsToBlock = emptySet()
+        bookings = emptyList()
 
         try {
             if (stats == null || refreshTrigger > 0) stats = api.getFacilityStats(currentUser.userId, facility.id)
@@ -62,37 +60,48 @@ fun FacilityManagerScreen(
         } catch (e: Exception) {
             println(e)
         } finally {
-            // 👇 WYŁĄCZAMY ŁADOWANIE (niezależnie czy sukces czy błąd)
             isLoading = false
         }
     }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+
+            // --- NAGŁÓWEK ---
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text("Panel Zarządzania", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Panel Kalendarza", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
+            // --- STATYSTYKI ---
             if (stats != null) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatsCard("Przychód (Msc)", "${stats!!.monthlyRevenue} PLN", Icons.Default.AttachMoney, RacingGreen, Modifier.weight(1f))
                     StatsCard("Rezerwacje", "${stats!!.totalBookings}", Icons.Default.DateRange, Color(0xFF1976D2), Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
-                Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Star, null, tint = Color(0xFFFFD700))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Top Boisko: ${stats!!.mostPopularField}", fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else { Text("Ładowanie statystyk...", Modifier.padding(16.dp), color = Color.Gray) }
+            } else {
+                Text("Ładowanie statystyk...", Modifier.padding(16.dp), color = Color.Gray)
+            }
 
-            Spacer(Modifier.height(16.dp))
-            Divider()
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
 
-            val daysList = remember(facility.maxDaysAdvance) { (0 until facility.maxDaysAdvance).map { LocalDate(2026, 2, 16).plus(DatePeriod(days = it)) } }
+            // --- JEŚLI NIE MA BOISK, KOŃCZYMY RYSOWANIE ---
+            if (facility.fields.isEmpty()) {
+                Text("Brak boisk w obiekcie. Dodaj je w zakładce 'Obiekty'.", Modifier.padding(16.dp), color = Color.Gray)
+                return@Column
+            }
+
+            // --- POBIERAMY OBECNIE WYBRANE BOISKO ---
+            // Zabezpieczenie na wypadek usunięcia boiska w trakcie bycia na ekranie
+            val selectedField = facility.fields.getOrNull(selectedTabIndex) ?: facility.fields.first()
+            val safeTabIndex = facility.fields.indexOf(selectedField)
+
+            // --- WYBÓR DATY (Odczytuje maxDaysAdvance dla konkrentego boiska!) ---
+            val daysList = remember(selectedField.maxDaysAdvance) {
+                (0 until selectedField.maxDaysAdvance).map { LocalDate(2026, 2, 16).plus(DatePeriod(days = it)) }
+            }
+
             fun getPolishDayAbbr(day: DayOfWeek): String = when(day) { DayOfWeek.MONDAY -> "PON."; DayOfWeek.TUESDAY -> "WT."; DayOfWeek.WEDNESDAY -> "ŚR."; DayOfWeek.THURSDAY -> "CZW."; DayOfWeek.FRIDAY -> "PT."; DayOfWeek.SATURDAY -> "SOB."; DayOfWeek.SUNDAY -> "ND."; else -> day.name.take(3) }
             fun getPolishMonthAbbr(month: Month): String = when(month) { Month.JANUARY -> "Sty"; Month.FEBRUARY -> "Lut"; Month.MARCH -> "Mar"; Month.APRIL -> "Kwi"; Month.MAY -> "Maj"; Month.JUNE -> "Cze"; Month.JULY -> "Lip"; Month.AUGUST -> "Sie"; Month.SEPTEMBER -> "Wrz"; Month.OCTOBER -> "Paź"; Month.NOVEMBER -> "Lis"; Month.DECEMBER -> "Gru"; else -> month.name.take(3) }
 
@@ -104,6 +113,7 @@ fun FacilityManagerScreen(
                     val circleColor = if (isSelected) RacingGreen else Color.Transparent
                     val numberColor = if (isSelected) Color.White else Color.Black
                     val borderColor = if (isSelected) RacingGreen else Color.LightGray
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { selectedDate = date }.padding(4.dp)) {
                         Text(getPolishDayAbbr(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
                         Spacer(Modifier.height(8.dp))
@@ -116,171 +126,55 @@ fun FacilityManagerScreen(
                 }
             }
 
-            Text("Grafik wizualny", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
+            // --- ZAKŁADKI BOISK (Nowość UX) ---
+            ScrollableTabRow(
+                selectedTabIndex = safeTabIndex,
+                edgePadding = 16.dp,
+                containerColor = Color.Transparent,
+                contentColor = RacingGreen
+            ) {
+                facility.fields.forEachIndexed { index, field ->
+                    Tab(
+                        selected = safeTabIndex == index,
+                        onClick = { selectedTabIndex = index },
+                        text = { Text(field.name, fontWeight = if(safeTabIndex == index) FontWeight.Bold else FontWeight.Normal) }
+                    )
+                }
+            }
 
-            // 👇 NOWE: Obsługa Spinnera. Jeśli ładuje - kręcioł. Jeśli nie - lista.
+            Spacer(Modifier.height(16.dp))
+
+            // --- WIDOK KALENDARZA DLA WYBRANEGO BOISKA ---
             if (isLoading) {
                 Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = RacingGreen)
                 }
             } else {
-                facility.fields.forEach { field ->
-                    Text(field.name, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 16.dp))
-                    Box(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                        val scrollState = rememberScrollState()
-                        Row(Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 16.dp)) {
-                            val startHour = facility.openingTime.split(":").first().toInt()
-                            val endHour = facility.closingTime.split(":").first().toInt()
-                            val step = field.minSlotDuration
-                            for (currentMinutes in (startHour * 60) until (endHour * 60) step step) {
-                                val h = currentMinutes / 60
-                                val m = currentMinutes % 60
-                                val slotStart = LocalTime(h, m)
-                                val existingBooking = bookings.find { booking ->
-                                    if (booking.fieldId != field.id) return@find false
-                                    val bs = try { LocalTime.parse(booking.startDate) } catch(e:Exception) { LocalTime(0,0) }
-                                    val be = try { LocalTime.parse(booking.endDate) } catch(e:Exception) { LocalTime(0,0) }
-                                    slotStart >= bs && slotStart < be
-                                }
-                                val isTechnical = existingBooking?.status == "TECHNICAL"
-                                val isClient = existingBooking != null && !isTechnical
-                                val isSelectedToBlock = selectedSlotsToBlock.contains(field.id to slotStart)
-                                val bgColor = when { isTechnical -> Color.DarkGray; isClient -> Color(0xFF1976D2); isSelectedToBlock -> ErrorRed; else -> Color.White }
-
-                                Column(Modifier.padding(end = 4.dp).width(85.dp)) {
-                                    Text("${if(h<10)"0$h" else h}:${if(m<10)"0$m" else m}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    Spacer(Modifier.height(4.dp))
-                                    Button(
-                                        onClick = { if (existingBooking != null) bookingToManage = existingBooking else { val key = field.id to slotStart; selectedSlotsToBlock = if (isSelectedToBlock) selectedSlotsToBlock - key else selectedSlotsToBlock + key } },
-                                        colors = ButtonDefaults.buttonColors(containerColor = bgColor), shape = RoundedCornerShape(4.dp), modifier = Modifier.height(50.dp).fillMaxWidth(),
-                                        border = if (existingBooking == null && !isSelectedToBlock) BorderStroke(1.dp, RacingGreen) else null
-                                    ) {
-                                        if (isTechnical) Icon(Icons.Default.Build, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                        else if (isClient) Text(existingBooking!!.clientName.take(6)+"..", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                                        else if (isSelectedToBlock) Icon(Icons.Default.Lock, null, tint = Color.White)
-                                    }
-                                }
-                            }
-                        }
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("TU ZBUDUJEMY NOWĄ OŚ CZASU", fontWeight = FontWeight.Bold, color = RacingGreen)
+                        Text("Dla boiska: ${selectedField.name}", color = Color.Gray)
+                        Text("Dla daty: $selectedDate", color = Color.Gray)
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Divider()
+            // --- OSTATNIA AKTYWNOŚĆ ---
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             Text("Ostatnia aktywność", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
-            if (recentBookings.isEmpty()) { Text("Brak nowej aktywności.", Modifier.padding(16.dp), color = Color.Gray) }
-            else { recentBookings.forEach { booking -> RecentBookingCard(booking); Spacer(Modifier.height(8.dp)) } }
+
+            if (recentBookings.isEmpty()) {
+                Text("Brak nowej aktywności.", Modifier.padding(horizontal = 16.dp), color = Color.Gray)
+            } else {
+                recentBookings.forEach { booking ->
+                    RecentBookingCard(booking)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
             Spacer(Modifier.height(80.dp))
         }
-
-        if (selectedSlotsToBlock.isNotEmpty()) {
-
-            // 👇 NOWE STANY DO OKIENKA (dodaj je tutaj, wewnątrz widoku)
-            var showManualBookingDialog by remember { mutableStateOf(false) }
-            var manualClientName by remember { mutableStateOf("") }
-
-            Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = Color.White, shadowElevation = 16.dp) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Wybrano terminów: ${selectedSlotsToBlock.size}", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        // 1. STARY PRZYCISK: PRZERWA TECHNICZNA
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    val requests = mergeSlotsToRequests(selectedSlotsToBlock, facility.fields, selectedDate.toString())
-                                    requests.forEach { req -> api.blockSlot(currentUser.userId, req) }
-                                    message = "Terminy zablokowane!"
-                                    selectedSlotsToBlock = emptySet()
-                                    refreshTrigger++
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("ZABLOKUJ (SERWIS)", style = MaterialTheme.typography.labelSmall) }
-
-                        Spacer(Modifier.width(8.dp))
-
-                        // 2. NOWY PRZYCISK: REZERWACJA RĘCZNA (TELEFON)
-                        Button(
-                            onClick = { showManualBookingDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = RacingGreen),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("DODAJ KLIENTA", style = MaterialTheme.typography.labelSmall) }
-                    }
-                }
-            }
-
-            // Wpisanie imienia klienta
-            if (showManualBookingDialog) {
-                AlertDialog(
-                    onDismissRequest = { showManualBookingDialog = false },
-                    title = { Text("Rezerwacja Manualna") },
-                    text = {
-                        Column {
-                            Text("Wpisz dane klienta z telefonu (np. Pan Romek):", style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = manualClientName,
-                                onValueChange = { manualClientName = it },
-                                label = { Text("Imię i nazwisko / Telefon") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    // 1. Zbieramy zaznaczone godziny w paczki (requesty)
-                                    val requests = mergeSlotsToRequests(selectedSlotsToBlock, facility.fields, selectedDate.toString())
-
-                                    // 2. Do każdej paczki dorzucamy imię naszego klienta!
-                                    val requestsWithClientName = requests.map { request ->
-                                        request.copy(manualClientName = manualClientName)
-                                    }
-
-                                    // 3. Wysyłamy do serwera.
-                                    // Używamy standardowego api.createBooking (bo to normalna rezerwacja)
-                                    try {
-                                        requestsWithClientName.forEach { req ->
-                                            api.createBooking(currentUser.userId, req)
-                                        }
-                                        message = "Zapisano klienta: $manualClientName"
-                                    } catch (e: Exception) {
-                                        message = "Błąd: ${e.message}"
-                                    }
-
-                                    // 4. Sprzątamy i odświeżamy
-                                    showManualBookingDialog = false
-                                    manualClientName = ""
-                                    selectedSlotsToBlock = emptySet()
-                                    refreshTrigger++ // To odświeży kalendarz!
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = RacingGreen)
-                        ) { Text("ZAPISZ") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showManualBookingDialog = false }) { Text("Anuluj") }
-                    }
-                )
-            }
-        }
-    }
-
-    if (bookingToManage != null) {
-        val isTech = bookingToManage!!.status == "TECHNICAL"
-        AlertDialog(
-            onDismissRequest = { bookingToManage = null },
-            title = { Text(if (isTech) "Przerwa techniczna" else "Rezerwacja Klienta") },
-            text = { Column { if (!isTech) { Text("Klient: ${bookingToManage!!.clientName}", fontWeight = FontWeight.Bold); Text("Email: ${bookingToManage!!.clientEmail}"); Text("Cena: ${bookingToManage!!.price} PLN") } else { Text("Blokada serwisowa.") }
-                Spacer(Modifier.height(8.dp)); Text("Godziny: ${bookingToManage!!.startDate} - ${bookingToManage!!.endDate}") } },
-            confirmButton = { Button(onClick = { scope.launch { api.cancelByOwner(currentUser.userId, bookingToManage!!.id); refreshTrigger++; bookingToManage = null } }, colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)) { Text(if (isTech) "Odblokuj" else "Anuluj Rezerwację") } },
-            dismissButton = { TextButton(onClick = { bookingToManage = null }) { Text("Zamknij") } }
-        )
     }
 }

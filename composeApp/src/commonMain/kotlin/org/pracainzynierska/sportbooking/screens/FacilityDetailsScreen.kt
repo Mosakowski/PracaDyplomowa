@@ -28,12 +28,12 @@ fun FacilityDetailsScreen(
     currentUser: AuthResponse?,
     onNavigateToScheduler: () -> Unit,
     onBack: () -> Unit
-    // USUNIĘTO: onNavigateToManager - klient tego nie potrzebuje!
 ) {
+    // Grupowanie boisk po typie (np. 2 korty, 1 boisko do piłki)
     val groupedFields = remember(facility.fields) { facility.fields.groupBy { it.type } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        // --- 1. NAGŁÓWEK ---
+        // --- 1. NAGŁÓWEK (Wizytówka) ---
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             elevation = CardDefaults.cardElevation(4.dp),
@@ -57,13 +57,15 @@ fun FacilityDetailsScreen(
                     Text(facility.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(facility.location, color = Color.Gray)
                     Spacer(Modifier.height(8.dp))
-                    Text("Otwarte: ${facility.openingTime} - ${facility.closingTime}", style = MaterialTheme.typography.labelMedium)
-                    facility.description?.let { if (it.isNotEmpty()) Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp)) }
+
+                    facility.description?.let {
+                        if (it.isNotEmpty()) Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                    }
                 }
             }
         }
 
-        // --- 2. OFERTA SPORTOWA (Tylko widok pogrupowany) ---
+        // --- 2. OFERTA SPORTOWA (Pogrupowane kafelki) ---
         Text("Oferta sportowa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
 
         if (facility.fields.isEmpty()) {

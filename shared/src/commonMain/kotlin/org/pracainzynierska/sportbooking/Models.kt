@@ -2,6 +2,8 @@ package org.pracainzynierska.sportbooking
 
 import kotlinx.serialization.Serializable
 
+enum class DayOfWeekIso { MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY }
+
 @Serializable
 data class FacilityDto(
     val id: Int,
@@ -9,11 +11,10 @@ data class FacilityDto(
     val location: String,
     val description: String?,
     val fields: List<FieldDto>,
-    val ownerId: Int,
-    val openingTime: String,    // np. "08:00"
-    val closingTime: String,    // np. "22:00"
-    val maxDaysAdvance: Int     // np. 30 (dni do przodu)
+    val ownerId: Int
+    // USUNIĘTO: openingTime, closingTime, maxDaysAdvance
 )
+
 // 1. Co wysyła użytkownik, gdy chce się zarejestrować?
 @Serializable
 data class RegisterRequest(
@@ -68,18 +69,23 @@ data class FieldDto(
     val id: Int,
     val name: String,
     val type: String,
-    val minSlotDuration: Int, // w minutach, np. 60 lub 90
-    val price: Double
+    val minSlotDuration: Int,
+    val price: Double,
+    // 👇 NOWE:
+    val description: String?,
+    val status: String,
+    val photoUrl: String?,
+    val maxDaysAdvance: Int,
+    val cancellationHours: Int,
+    val weeklySchedule: Map<DayOfWeekIso, DaySchedule>?
 )
 
 @Serializable
 data class AddFacilityRequest(
     val name: String,
     val location: String,
-    val description: String?,
-    val openingTime: String = "08:00",
-    val closingTime: String = "22:00",
-    val maxDaysAdvance: Int = 30
+    val description: String?
+    // USUNIĘTO: godziny i dni
 )
 
 @Serializable
@@ -88,7 +94,14 @@ data class AddFieldRequest(
     val name: String,
     val fieldType: String,
     val price: Double,
-    val minSlotDuration: Int = 60
+    val minSlotDuration: Int = 60,
+    // 👇 NOWE: Wymagane przy tworzeniu z formularza
+    val description: String? = null,
+    val status: String = "ACTIVE",
+    val photoUrl: String? = null,
+    val maxDaysAdvance: Int = 30,
+    val cancellationHours: Int = 24,
+    val weeklySchedule: Map<DayOfWeekIso, DaySchedule> = emptyMap()
 )
 
 @Serializable
@@ -138,4 +151,11 @@ data class FacilityAdminDto(
     val name: String,
     val ownerName: String, // Żeby admin wiedział czyje to
     val location: String
+)
+
+@Serializable
+data class DaySchedule(
+    val isOpen: Boolean,      // Czy otwarte?
+    val openTime: String? = null,    // "08:00"
+    val closeTime: String? = null    // "22:00"
 )
