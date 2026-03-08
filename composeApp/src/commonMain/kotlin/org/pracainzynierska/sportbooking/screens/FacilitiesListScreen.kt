@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import org.pracainzynierska.sportbooking.AuthResponse
 import org.pracainzynierska.sportbooking.FacilityDto
 import org.pracainzynierska.sportbooking.SportApi
-import org.pracainzynierska.sportbooking.components.AddFacilityDialog
 import org.pracainzynierska.sportbooking.components.FacilityCard
 import org.pracainzynierska.sportbooking.components.SportFilterChip
 

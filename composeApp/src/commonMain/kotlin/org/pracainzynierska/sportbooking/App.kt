@@ -45,7 +45,7 @@ fun App() {
             Column(Modifier.fillMaxSize()) {
 
                 // --- 1. NAGŁÓWEK (HEADER) ---
-                // UWAGA: Kiedy Właściciel jest w OwnerMainScreen, ten górny pasek nadal tu jest.
+                // UWAGA: Kiedy Właściciel jest w OwnerDashboardScreen, ten górny pasek nadal tu jest.
                 // Będziemy mogli go w przyszłości ukryć dla właściciela, ale na razie niech zostanie.
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -170,10 +170,10 @@ fun App() {
                             } else currentScreen = Screen.List
                         }
 
-                        // Rejestrujemy naszą nową Skorupę (OwnerMainScreen)
+                        // Rejestrujemy naszą nową Skorupę
                         is Screen.OwnerMain -> {
                             if (currentUser != null && currentUser!!.role == "FIELD_OWNER") {
-                                OwnerMainScreen(
+                                OwnerDashboardScreen( // <--- TUTAJ JEST GŁÓWNA NAPRAWA
                                     api = api,
                                     currentUser = currentUser!!,
                                     onLogout = {
@@ -187,7 +187,7 @@ fun App() {
                             } else currentScreen = Screen.Login
                         }
 
-                        // Ten ekran będziemy za chwilę przenosić do środka OwnerMainScreen
+                        // Ten ekran otwiera się po kliknięciu orlika na liście w zakładce "Obiekty"
                         is Screen.OwnerFacilityDetails -> {
                             if (currentUser != null) {
                                 FacilityDetailsOwnerScreen(

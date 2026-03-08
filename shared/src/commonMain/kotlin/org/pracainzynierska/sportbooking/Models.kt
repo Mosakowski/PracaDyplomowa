@@ -11,8 +11,11 @@ data class FacilityDto(
     val location: String,
     val description: String?,
     val fields: List<FieldDto>,
-    val ownerId: Int
-    // USUNIĘTO: openingTime, closingTime, maxDaysAdvance
+    val ownerId: Int,
+    // 👇 NOWE: Pola dla Obiektu z Twojej rozpiski
+    val contactPhone: String? = null,
+    val photoUrl: String? = null,
+    val status: String = "ACTIVE"
 )
 
 // 1. Co wysyła użytkownik, gdy chce się zarejestrować?
@@ -71,7 +74,6 @@ data class FieldDto(
     val type: String,
     val minSlotDuration: Int,
     val price: Double,
-    // 👇 NOWE:
     val description: String?,
     val status: String,
     val photoUrl: String?,
@@ -84,10 +86,12 @@ data class FieldDto(
 data class AddFacilityRequest(
     val name: String,
     val location: String,
-    val description: String?
-    // USUNIĘTO: godziny i dni
+    val description: String?,
+    // 👇 NOWE: Pola dla Obiektu z Twojej rozpiski
+    val contactPhone: String? = null,
+    val photoUrl: String? = null,
+    val status: String = "ACTIVE"
 )
-
 @Serializable
 data class AddFieldRequest(
     val facilityId: Int,
@@ -95,7 +99,6 @@ data class AddFieldRequest(
     val fieldType: String,
     val price: Double,
     val minSlotDuration: Int = 60,
-    // 👇 NOWE: Wymagane przy tworzeniu z formularza
     val description: String? = null,
     val status: String = "ACTIVE",
     val photoUrl: String? = null,
