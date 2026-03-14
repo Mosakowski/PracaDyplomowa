@@ -21,17 +21,23 @@ import org.pracainzynierska.sportbooking.LoginRequest
 import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 
+import org.pracainzynierska.sportbooking.viewmodels.LoginViewModel
+import org.koin.compose.viewmodel.koinViewModel
+
 @Composable
 fun LoginScreen(
     onLoginSuccess: (AuthResponse) -> Unit,
     onNavigateToRegister: () -> Unit,
-    api: SportApi
+    viewModel: LoginViewModel = koinViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.loginSuccess) {
+        uiState.loginSuccess?.let {
+            onLoginSuccess(it)
+            viewModel.resetLoginSuccess()
+        }
+    }
 
     Column(
         Modifier.fillMaxSize(),
@@ -45,14 +51,14 @@ fun LoginScreen(
         Spacer(Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = email, onValueChange = { email = it },
+            value = uiState.email, onValueChange = { viewModel.onEmailChanged(it) },
             label = { Text("Adres email") },
             leadingIcon = { Icon(Icons.Default.Email, null) },
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
-            value = password, onValueChange = { password = it },
+            value = uiState.password, onValueChange = { viewModel.onPasswordChanged(it) },
             label = { Text("Hasło") },
             leadingIcon = { Icon(Icons.Default.Key, null) },
             visualTransformation = PasswordVisualTransformation(),
@@ -62,29 +68,16 @@ fun LoginScreen(
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = {
-                scope.launch {
-                    try {
-                        isLoading = true
-                        errorMessage = null
-                        val user = api.login(LoginRequest(email, password))
-                        onLoginSuccess(user)
-                    } catch (e: Exception) {
-                        errorMessage = "Błąd: Nieprawidłowe dane"
-                    } finally {
-                        isLoading = false //c
-                    }
-                }
-            },
+            onClick = { viewModel.login() },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(8.dp),
-            enabled = !isLoading
+            enabled = !uiState.isLoading
         ) {
-            if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            if (uiState.isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
             else Text("Zaloguj się")
         }
 
-        errorMessage?.let {
+        uiState.errorMessage?.let {
             Spacer(Modifier.height(16.dp))
             Text(it, color = MaterialTheme.colorScheme.error)
         }
@@ -94,7 +87,5 @@ fun LoginScreen(
         TextButton(onClick = onNavigateToRegister) {
             Text("Nie masz konta? Załóż je tutaj")
         }
-
-
     }
-}
+}

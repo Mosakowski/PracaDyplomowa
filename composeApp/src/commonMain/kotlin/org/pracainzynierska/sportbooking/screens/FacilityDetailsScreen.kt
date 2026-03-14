@@ -22,15 +22,18 @@ import org.pracainzynierska.sportbooking.FacilityDto
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 import org.pracainzynierska.sportbooking.theme.RacingGreenLight
 
+import org.pracainzynierska.sportbooking.viewmodels.FacilityDetailsViewModel
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+
 @Composable
 fun FacilityDetailsScreen(
     facility: FacilityDto,
-    currentUser: AuthResponse?,
     onNavigateToScheduler: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: FacilityDetailsViewModel = koinViewModel { parametersOf(facility) }
 ) {
-    // Grupowanie boisk po typie (np. 2 korty, 1 boisko do piłki)
-    val groupedFields = remember(facility.fields) { facility.fields.groupBy { it.type } }
+    val uiState = viewModel.uiState
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // --- 1. NAGŁÓWEK (Wizytówka) ---
@@ -54,11 +57,11 @@ fun FacilityDetailsScreen(
                 }
 
                 Column(Modifier.padding(16.dp)) {
-                    Text(facility.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(facility.location, color = Color.Gray)
+                    Text(uiState.facility.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(uiState.facility.location, color = Color.Gray)
                     Spacer(Modifier.height(8.dp))
 
-                    facility.description?.let {
+                    uiState.facility.description?.let {
                         if (it.isNotEmpty()) Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
@@ -68,10 +71,10 @@ fun FacilityDetailsScreen(
         // --- 2. OFERTA SPORTOWA (Pogrupowane kafelki) ---
         Text("Oferta sportowa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
 
-        if (facility.fields.isEmpty()) {
+        if (uiState.facility.fields.isEmpty()) {
             Text("Ten obiekt nie ma jeszcze dodanych boisk.", color = Color.Gray, modifier = Modifier.padding(horizontal = 16.dp))
         } else {
-            groupedFields.forEach { (type, fieldsList) ->
+            uiState.groupedFields.forEach { (type, fieldsList) ->
                 Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
                     Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -96,7 +99,7 @@ fun FacilityDetailsScreen(
         Spacer(Modifier.height(24.dp))
 
         // --- 3. PRZYCISK REZERWACJI ---
-        if (facility.fields.isNotEmpty()) {
+        if (uiState.facility.fields.isNotEmpty()) {
             Button(
                 onClick = onNavigateToScheduler,
                 modifier = Modifier.fillMaxWidth().padding(16.dp).height(50.dp),

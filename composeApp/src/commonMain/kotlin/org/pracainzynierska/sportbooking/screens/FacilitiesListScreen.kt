@@ -18,39 +18,17 @@ import org.pracainzynierska.sportbooking.FacilityDto
 import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.components.FacilityCard
 import org.pracainzynierska.sportbooking.components.SportFilterChip
+import org.pracainzynierska.sportbooking.theme.RacingGreen
+
+import org.pracainzynierska.sportbooking.viewmodels.FacilitiesViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun FacilitiesScreen(
-    api: SportApi,
-    currentUser: AuthResponse?,
-    onNavigateToDetails: (FacilityDto) -> Unit
+    onNavigateToDetails: (FacilityDto) -> Unit,
+    viewModel: FacilitiesViewModel = koinViewModel()
 ) {
-    var refreshTrigger by remember { mutableStateOf(0) }
-    var facilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
-
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedSport by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(refreshTrigger) {
-        try { facilities = api.getFacilities() } catch (e: Exception) { println(e) }
-    }
-
-    val filteredFacilities = remember(facilities, searchQuery, selectedSport) {
-        facilities.filter { facility ->
-            val matchesText = if (searchQuery.isBlank()) true else {
-                facility.name.contains(searchQuery, ignoreCase = true) ||
-                        facility.location.contains(searchQuery, ignoreCase = true)
-            }
-            val matchesSport = if (selectedSport == null) true else {
-                facility.fields.any { it.type == selectedSport }
-            }
-            matchesText && matchesSport
-        }
-    }
-
-    val allSports = remember(facilities) {
-        facilities.flatMap { it.fields.map { field -> field.type } }.distinct().sorted()
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.padding(16.dp)) {
@@ -60,11 +38,13 @@ fun FacilitiesScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Znajdź obiekt", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = RacingGreen)
+                }
             }
 
             OutlinedTextField(
-                value = searchQuery, onValueChange = { searchQuery = it },
+                value = uiState.searchQuery, onValueChange = { viewModel.onSearchQueryChanged(it) },
                 label = { Text("Miasto, ulica lub nazwa...") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -78,29 +58,28 @@ fun FacilitiesScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 item {
-                    SportFilterChip("Wszystkie", (selectedSport == null)) { selectedSport = null }
+                    SportFilterChip("Wszystkie", (uiState.selectedSport == null)) { viewModel.onSportSelected(null) }
                 }
-                items(allSports.size) { index ->
-                    val sport = allSports[index]
+                items(uiState.allSports.size) { index ->
+                    val sport = uiState.allSports[index]
                     val niceName = sport.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
-                    SportFilterChip(niceName, (selectedSport == sport)) {
-                        selectedSport = if (selectedSport == sport) null else sport
+                    SportFilterChip(niceName, (uiState.selectedSport == sport)) {
+                        viewModel.onSportSelected(sport)
                     }
                 }
             }
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                items(filteredFacilities.size) { index ->
+                items(uiState.filteredFacilities.size) { index ->
                     FacilityCard(
-                        facility = filteredFacilities[index],
-                        onNavigate = { onNavigateToDetails(filteredFacilities[index]) }
+                        facility = uiState.filteredFacilities[index],
+                        onNavigate = { onNavigateToDetails(uiState.filteredFacilities[index]) }
                     )
                 }
-                if (filteredFacilities.isEmpty()) {
+                if (uiState.filteredFacilities.isEmpty() && !uiState.isLoading) {
                     item { Text("Brak wyników.", modifier = Modifier.fillMaxWidth().padding(top = 24.dp), color = Color.Gray) }
                 }
             }
         }
-
     }
-}
+}

@@ -4,7 +4,6 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -15,54 +14,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import kotlinx.datetime.*
-import org.pracainzynierska.sportbooking.AuthResponse
-import org.pracainzynierska.sportbooking.FacilityDto
-import org.pracainzynierska.sportbooking.FacilityStatsDto
-import org.pracainzynierska.sportbooking.OwnerBookingDto
-import org.pracainzynierska.sportbooking.SportApi
+import org.pracainzynierska.sportbooking.*
 import org.pracainzynierska.sportbooking.components.RecentBookingCard
 import org.pracainzynierska.sportbooking.components.StatsCard
-import org.pracainzynierska.sportbooking.theme.ErrorRed
 import org.pracainzynierska.sportbooking.theme.RacingGreen
+import org.pracainzynierska.sportbooking.viewmodels.FacilityManagerViewModel
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun FacilityManagerScreen(
     facility: FacilityDto,
-    api: SportApi,
-    currentUser: AuthResponse,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: FacilityManagerViewModel = koinViewModel { parametersOf(facility) }
 ) {
-    // Statystyki
-    var stats by remember { mutableStateOf<FacilityStatsDto?>(null) }
-
-    // Czas i Ładowanie
-    var selectedDate by remember { mutableStateOf(LocalDate(2026, 2, 16)) }
-    var refreshTrigger by remember { mutableStateOf(0) }
-    var isLoading by remember { mutableStateOf(false) }
-
-    // Dane z bazy
-    var recentBookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
-    var bookings by remember { mutableStateOf<List<OwnerBookingDto>>(emptyList()) }
-
-    // Zakładki Boisk
-    var selectedTabIndex by remember { mutableStateOf(0) }
-
-    LaunchedEffect(refreshTrigger, selectedDate) {
-        isLoading = true
-        bookings = emptyList()
-
-        try {
-            if (stats == null || refreshTrigger > 0) stats = api.getFacilityStats(currentUser.userId, facility.id)
-            bookings = api.getOwnerBookings(currentUser.userId, facility.id, selectedDate.toString())
-            recentBookings = api.getRecentBookings(currentUser.userId, facility.id)
-        } catch (e: Exception) {
-            println(e)
-        } finally {
-            isLoading = false
-        }
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -74,10 +41,10 @@ fun FacilityManagerScreen(
             }
 
             // --- STATYSTYKI ---
-            if (stats != null) {
+            if (uiState.stats != null) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatsCard("Przychód (Msc)", "${stats!!.monthlyRevenue} PLN", Icons.Default.AttachMoney, RacingGreen, Modifier.weight(1f))
-                    StatsCard("Rezerwacje", "${stats!!.totalBookings}", Icons.Default.DateRange, Color(0xFF1976D2), Modifier.weight(1f))
+                    StatsCard("Przychód (Msc)", "${uiState.stats?.monthlyRevenue} PLN", Icons.Default.AttachMoney, RacingGreen, Modifier.weight(1f))
+                    StatsCard("Rezerwacje", "${uiState.stats?.totalBookings}", Icons.Default.DateRange, Color(0xFF1976D2), Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
             } else {
@@ -93,13 +60,13 @@ fun FacilityManagerScreen(
             }
 
             // --- POBIERAMY OBECNIE WYBRANE BOISKO ---
-            // Zabezpieczenie na wypadek usunięcia boiska w trakcie bycia na ekranie
-            val selectedField = facility.fields.getOrNull(selectedTabIndex) ?: facility.fields.first()
+            val selectedField = facility.fields.getOrNull(uiState.selectedTabIndex) ?: facility.fields.first()
             val safeTabIndex = facility.fields.indexOf(selectedField)
 
-            // --- WYBÓR DATY (Odczytuje maxDaysAdvance dla konkrentego boiska!) ---
+            // --- WYBÓR DATY ---
+            val today = LocalDate(2026, 2, 16)
             val daysList = remember(selectedField.maxDaysAdvance) {
-                (0 until selectedField.maxDaysAdvance).map { LocalDate(2026, 2, 16).plus(DatePeriod(days = it)) }
+                (0 until selectedField.maxDaysAdvance).map { today.plus(DatePeriod(days = it)) }
             }
 
             fun getPolishDayAbbr(day: DayOfWeek): String = when(day) { DayOfWeek.MONDAY -> "PON."; DayOfWeek.TUESDAY -> "WT."; DayOfWeek.WEDNESDAY -> "ŚR."; DayOfWeek.THURSDAY -> "CZW."; DayOfWeek.FRIDAY -> "PT."; DayOfWeek.SATURDAY -> "SOB."; DayOfWeek.SUNDAY -> "ND."; else -> day.name.take(3) }
@@ -108,13 +75,13 @@ fun FacilityManagerScreen(
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(daysList.size) { index ->
                     val date = daysList[index]
-                    val isSelected = (date == selectedDate)
+                    val isSelected = (date == uiState.selectedDate)
                     val contentColor = if (isSelected) RacingGreen else Color.Gray
                     val circleColor = if (isSelected) RacingGreen else Color.Transparent
                     val numberColor = if (isSelected) Color.White else Color.Black
                     val borderColor = if (isSelected) RacingGreen else Color.LightGray
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { selectedDate = date }.padding(4.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { viewModel.onDateSelected(date) }.padding(4.dp)) {
                         Text(getPolishDayAbbr(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
                         Spacer(Modifier.height(8.dp))
                         Surface(shape = CircleShape, color = circleColor, border = BorderStroke(1.dp, borderColor), modifier = Modifier.size(42.dp)) {
@@ -126,7 +93,7 @@ fun FacilityManagerScreen(
                 }
             }
 
-            // --- ZAKŁADKI BOISK (Nowość UX) ---
+            // --- ZAKŁADKI BOISK ---
             ScrollableTabRow(
                 selectedTabIndex = safeTabIndex,
                 edgePadding = 16.dp,
@@ -136,7 +103,7 @@ fun FacilityManagerScreen(
                 facility.fields.forEachIndexed { index, field ->
                     Tab(
                         selected = safeTabIndex == index,
-                        onClick = { selectedTabIndex = index },
+                        onClick = { viewModel.onTabSelected(index) },
                         text = { Text(field.name, fontWeight = if(safeTabIndex == index) FontWeight.Bold else FontWeight.Normal) }
                     )
                 }
@@ -145,7 +112,7 @@ fun FacilityManagerScreen(
             Spacer(Modifier.height(16.dp))
 
             // --- WIDOK KALENDARZA DLA WYBRANEGO BOISKA ---
-            if (isLoading) {
+            if (uiState.isLoading) {
                 Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = RacingGreen)
                 }
@@ -157,7 +124,7 @@ fun FacilityManagerScreen(
                     Column(Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("TU ZBUDUJEMY NOWĄ OŚ CZASU", fontWeight = FontWeight.Bold, color = RacingGreen)
                         Text("Dla boiska: ${selectedField.name}", color = Color.Gray)
-                        Text("Dla daty: $selectedDate", color = Color.Gray)
+                        Text("Dla daty: ${uiState.selectedDate}", color = Color.Gray)
                     }
                 }
             }
@@ -166,14 +133,19 @@ fun FacilityManagerScreen(
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             Text("Ostatnia aktywność", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
 
-            if (recentBookings.isEmpty()) {
+            if (uiState.recentBookings.isEmpty()) {
                 Text("Brak nowej aktywności.", Modifier.padding(horizontal = 16.dp), color = Color.Gray)
             } else {
-                recentBookings.forEach { booking ->
+                uiState.recentBookings.forEach { booking ->
                     RecentBookingCard(booking)
                     Spacer(Modifier.height(8.dp))
                 }
             }
+            
+            uiState.errorMessage?.let {
+                Text(it, color = Color.Red, modifier = Modifier.padding(16.dp))
+            }
+            
             Spacer(Modifier.height(80.dp))
         }
     }

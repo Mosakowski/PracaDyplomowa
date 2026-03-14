@@ -18,27 +18,25 @@ import org.pracainzynierska.sportbooking.RegisterRequest
 import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 
+import org.pracainzynierska.sportbooking.viewmodels.RegisterViewModel
+import org.koin.compose.viewmodel.koinViewModel
+
 @Composable
 fun RegisterScreen(
-    api: SportApi,
     onRegisterSuccess: () -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    viewModel: RegisterViewModel = koinViewModel()
 ) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var isOwner by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    //  Stan błędu dla emaila
-    var emailError by remember { mutableStateOf(false) }
-
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isProcessing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    LaunchedEffect(uiState.registerSuccess) {
+        if (uiState.registerSuccess) {
+            onRegisterSuccess()
+        }
+    }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), // Dodałem padding dla estetyki
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -50,28 +48,23 @@ fun RegisterScreen(
         Spacer(Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = name, onValueChange = { name = it },
+            value = uiState.name, onValueChange = { viewModel.onNameChanged(it) },
             label = { Text("Imię i Nazwisko") },
             leadingIcon = { Icon(Icons.Default.Person, null) },
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
         Spacer(Modifier.height(16.dp))
 
-        //  ZMODYFIKOWANE POLE EMAIL
         OutlinedTextField(
-            value = email,
-            onValueChange = {
-                email = it
-                emailError = false // Resetujemy błąd, gdy użytkownik zaczyna poprawiać
-                errorMessage = null
-            },
+            value = uiState.email,
+            onValueChange = { viewModel.onEmailChanged(it) },
             label = { Text("Adres Email") },
             leadingIcon = { Icon(Icons.Default.Email, null) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            isError = emailError, // Zapala czerwoną ramkę
+            isError = uiState.emailError,
             supportingText = {
-                if (emailError) {
+                if (uiState.emailError) {
                     Text("Niepoprawny format adresu email", color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -79,7 +72,7 @@ fun RegisterScreen(
         Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = password, onValueChange = { password = it },
+            value = uiState.password, onValueChange = { viewModel.onPasswordChanged(it) },
             label = { Text("Hasło") },
             leadingIcon = { Icon(Icons.Default.Lock, null) },
             visualTransformation = PasswordVisualTransformation(),
@@ -88,20 +81,20 @@ fun RegisterScreen(
         Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = confirmPassword, onValueChange = { confirmPassword = it },
+            value = uiState.confirmPassword, onValueChange = { viewModel.onConfirmPasswordChanged(it) },
             label = { Text("Powtórz hasło") },
             leadingIcon = { Icon(Icons.Default.Lock, null) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            isError = password.isNotEmpty() && confirmPassword.isNotEmpty() && password != confirmPassword,
+            isError = uiState.password.isNotEmpty() && uiState.confirmPassword.isNotEmpty() && uiState.password != uiState.confirmPassword,
             singleLine = true
         )
 
         Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Checkbox(
-                checked = isOwner,
-                onCheckedChange = { isOwner = it },
+                checked = uiState.isOwner,
+                onCheckedChange = { viewModel.onIsOwnerChanged(it) },
                 colors = CheckboxDefaults.colors(checkedColor = RacingGreen)
             )
             Text("Chcę zarządzać obiektem (Konto Właściciela)")
@@ -109,59 +102,18 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        if (errorMessage != null) {
-            Text(errorMessage!!, color = MaterialTheme.colorScheme.error)
+        if (uiState.errorMessage != null) {
+            Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(16.dp))
         }
 
         Button(
-            onClick = {
-                if (isProcessing) return@Button
-
-                // 1. Sprawdź puste pola
-                if (email.isBlank() || password.isBlank() || name.isBlank()) {
-                    errorMessage = "Wypełnij wszystkie pola."
-                    return@Button
-                }
-
-                // 2.  SPRAWDZENIE EMAILA
-                if (!isValidEmail(email)) {
-                    emailError = true
-                    errorMessage = "Podaj poprawny adres email."
-                    return@Button
-                }
-
-                // 3. Sprawdź hasła
-                if (password != confirmPassword) {
-                    errorMessage = "Hasła nie są identyczne!"
-                    return@Button
-                }
-
-                isProcessing = true
-                errorMessage = null
-
-                scope.launch {
-                    try {
-                        val request = RegisterRequest(name = name, email = email, password = password, isOwner = isOwner)
-                        val success = api.register(request)
-
-                        if (success) {
-                            onRegisterSuccess()
-                        } else {
-                            errorMessage = "Rejestracja nieudana. Email może być zajęty."
-                            isProcessing = false
-                        }
-                    } catch (e: Exception) {
-                        errorMessage = "Błąd: ${e.message}"
-                        isProcessing = false
-                    }
-                }
-            },
+            onClick = { viewModel.register() },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = RacingGreen),
-            enabled = !isProcessing
+            enabled = !uiState.isProcessing
         ) {
-            if (isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            if (uiState.isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
             else Text("ZAREJESTRUJ SIĘ")
         }
 
@@ -170,9 +122,4 @@ fun RegisterScreen(
             Text("Masz już konto? Zaloguj się", color = RacingGreen)
         }
     }
-}
-
-fun isValidEmail(email: String): Boolean {
-    val emailRegex = "[a-zA-Z0-9\\+\\.\\_\\%\\-\\+]{1,256}@[a-zA-Z0-9][a-zA-Z0-9\\-]{0,64}(\\.[a-zA-Z0-9][a-zA-Z0-9\\-]{0,25})+"
-    return email.matches(emailRegex.toRegex())
 }

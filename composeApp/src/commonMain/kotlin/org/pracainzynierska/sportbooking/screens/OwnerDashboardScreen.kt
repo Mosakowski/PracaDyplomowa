@@ -1,113 +1,100 @@
 package org.pracainzynierska.sportbooking.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.pracainzynierska.sportbooking.AuthResponse
 import org.pracainzynierska.sportbooking.FacilityDto
-import org.pracainzynierska.sportbooking.SportApi
+import org.pracainzynierska.sportbooking.theme.RacingGreen
+import org.pracainzynierska.sportbooking.viewmodels.OwnerDashboardViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
-enum class OwnerTab(val title: String, val icon: ImageVector) {
-    DASHBOARD("Centrum", Icons.Default.Home),
-    CALENDAR("Kalendarz", Icons.Default.DateRange),
-    FACILITIES("Obiekty", Icons.Default.Settings),
-    BUSINESS("Biznes", Icons.Default.Insights)
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OwnerDashboardScreen( // Twoja główna skorupa
-    api: SportApi,
-    currentUser: AuthResponse,
+fun OwnerDashboardScreen(
     onLogout: () -> Unit,
-    onNavigateToFacilityDetails: (FacilityDto) -> Unit
+    onNavigateToFacilityDetails: (FacilityDto) -> Unit,
+    viewModel: OwnerDashboardViewModel = koinViewModel()
 ) {
-    var currentTab by remember { mutableStateOf(OwnerTab.DASHBOARD) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold { paddingValues ->
-        Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-
-            // 1. LEWA STRONA: Pasek Boczny
-            NavigationRail(
-                header = {
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Logout, contentDescription = "Wyloguj")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Twój biznes", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { 
+                        viewModel.logout()
+                        onLogout() 
+                    }) {
+                        Icon(Icons.Default.ExitToApp, null)
                     }
                 }
-            ) {
-                OwnerTab.entries.forEach { tab ->
-                    NavigationRailItem(
-                        selected = (currentTab == tab),
-                        onClick = { currentTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.title) },
-                        label = { Text(tab.title) }
-                    )
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { /* Akcja dodawania obiektu */ },
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("Dodaj obiekt") },
+                containerColor = RacingGreen,
+                contentColor = Color.White
+            )
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding).padding(16.dp)) {
+            Text("Twoje obiekty", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+
+            if (uiState.isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
+                    CircularProgressIndicator(color = RacingGreen) 
+                }
+            } else if (uiState.myFacilities.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Nie masz jeszcze żadnych obiektów.", color = Color.Gray)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(uiState.myFacilities.size) { index ->
+                        val facility = uiState.myFacilities[index]
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onNavigateToFacilityDetails(facility) },
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = RacingGreen.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.size(50.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Business, null, tint = RacingGreen)
+                                    }
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                Column {
+                                    Text(facility.name, fontWeight = FontWeight.Bold)
+                                    Text(facility.location, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
                 }
             }
-
-            // 2. PRAWA STRONA: Główna treść
-            Box(modifier = Modifier.weight(1f)) {
-                when (currentTab) {
-
-                    // ZAKŁADKA 1: CENTRUM (KOKPIT)
-                    OwnerTab.DASHBOARD -> {
-                        // Tutaj w przyszłości wkleimy kod z wykresem 68% i kalendarzykiem.
-                        // Na ten moment zostawiamy placeholder, żeby sprawdzić czy nawigacja nie wybucha.
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(16.dp))
-                            Text("Właściwy kokpit (68% i aktywność) pojawi się tutaj.", style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-
-                    // ZAKŁADKA 2: KALENDARZ
-                    OwnerTab.CALENDAR -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(16.dp))
-                            Text("Aby zarządzać kalendarzem konkretnego boiska...", style = MaterialTheme.typography.titleMedium)
-                            Text("Przejdź do zakładki 'Obiekty', wybierz orlik i kliknij panel kalendarza.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // ZAKŁADKA 3: OBIEKTY (WYPŁASZCZONA INFRASTRUKTURA)
-                    OwnerTab.FACILITIES -> {
-                        OwnerFacilitiesScreen(
-                            api = api,
-                            currentUser = currentUser,
-                            // Gdy z wnętrza detali ktoś kliknie "PANEL KALENDARZA", przekazujemy to wyżej!
-                            onNavigateToManager = { kliknietyObiekt ->
-                                onNavigateToFacilityDetails(kliknietyObiekt) // To odpali w App.kt OwnerCalendar
-                            }
-                        )
-                    }
-
-                    // ZAKŁADKA 4: BIZNES
-                    OwnerTab.BUSINESS -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.Insights, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(16.dp))
-                            Text("Moduł Business Intelligence", style = MaterialTheme.typography.headlineMedium)
-                        }
-                    }
-                }
+            
+            uiState.errorMessage?.let {
+                Text(it, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }

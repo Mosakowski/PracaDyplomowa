@@ -3,8 +3,11 @@ package org.pracainzynierska.sportbooking.screens
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,190 +15,231 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.pracainzynierska.sportbooking.BookingDto
 import org.pracainzynierska.sportbooking.FacilityDto
-import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.components.BlikPaymentDialog
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 import org.pracainzynierska.sportbooking.theme.RacingGreenLight
 import org.pracainzynierska.sportbooking.utils.calculateTotalPrice
-import org.pracainzynierska.sportbooking.utils.mergeSlotsToRequests
 
+import org.pracainzynierska.sportbooking.viewmodels.SchedulerViewModel
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulerScreen(
     facility: FacilityDto,
-    api: SportApi,
-    userId: Int,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: SchedulerViewModel = koinViewModel { parametersOf(facility) }
 ) {
-    val today = remember { LocalDate(2026, 2, 16) }
-    var selectedDate by remember { mutableStateOf(today) }
-    var refreshTrigger by remember { mutableStateOf(0) }
-    var isLoading by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    // Rezerwacje
-    var takenSlots by remember { mutableStateOf<List<BookingDto>>(emptyList()) }
-    var selectedSlots by remember { mutableStateOf<Set<Pair<Int, LocalTime>>>(emptySet()) }
-
-    // Płatności i komunikaty
-    var showPaymentDialog by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    // Zakładki (Które boisko aktualnie oglądamy)
-    var selectedTabIndex by remember { mutableStateOf(0) }
-
-    LaunchedEffect(selectedDate, refreshTrigger) {
-        isLoading = true
-        takenSlots = emptyList()
-        selectedSlots = emptySet()
-
-        try {
-            takenSlots = api.getTakenSlots(facility.id, selectedDate.toString())
-        } catch (e: Exception) {
-            println("Błąd: $e")
-        } finally {
-            isLoading = false
-        }
+    // --- HELPERY DO PRZETWARZANIA DATY I CZASU ---
+    fun getPolishDayAbbr(day: DayOfWeek): String = when(day) {
+        DayOfWeek.MONDAY -> "PON."
+        DayOfWeek.TUESDAY -> "WT."
+        DayOfWeek.WEDNESDAY -> " ŚR."
+        DayOfWeek.THURSDAY -> "CZW."
+        DayOfWeek.FRIDAY -> "PT."
+        DayOfWeek.SATURDAY -> "SOB."
+        DayOfWeek.SUNDAY -> "ND."
+        else -> day.name.take(3)
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            // --- NAGŁÓWEK ---
-            Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("< Wróć") }
-                Text(facility.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(48.dp))
-            }
+    fun getPolishMonthAbbr(month: Month): String = when(month) {
+        Month.JANUARY -> "Sty"
+        Month.FEBRUARY -> "Lut"
+        Month.MARCH -> "Mar"
+        Month.APRIL -> "Kwi"
+        Month.MAY -> "Maj"
+        Month.JUNE -> "Cze"
+        Month.JULY -> "Lip"
+        Month.AUGUST -> "Sie"
+        Month.SEPTEMBER -> "Wrz"
+        Month.OCTOBER -> "Paź"
+        Month.NOVEMBER -> "Lis"
+        Month.DECEMBER -> "Gru"
+        else -> month.name.take(3)
+    }
 
-            if (facility.fields.isEmpty()) {
-                Text("Obiekt nie posiada żadnych boisk.", Modifier.padding(16.dp), color = Color.Gray)
-                return@Column
-            }
-
-            // --- POBIERAMY OBECNIE WYBRANE BOISKO ---
-            val selectedField = facility.fields.getOrNull(selectedTabIndex) ?: facility.fields.first()
-            val safeTabIndex = facility.fields.indexOf(selectedField)
-
-            // --- ZAKŁADKI BOISK ---
-            ScrollableTabRow(
-                selectedTabIndex = safeTabIndex,
-                edgePadding = 16.dp,
-                containerColor = Color.Transparent,
-                contentColor = RacingGreen
-            ) {
-                facility.fields.forEachIndexed { index, field ->
-                    Tab(
-                        selected = safeTabIndex == index,
-                        onClick = {
-                            selectedTabIndex = index
-                            // Opcjonalnie: czyścimy wybrane sloty przy zmianie boiska,
-                            // żeby użytkownik przypadkiem nie zarezerwował dwóch różnych na raz.
-                            selectedSlots = emptySet()
-                        },
-                        text = { Text(field.name, fontWeight = if(safeTabIndex == index) FontWeight.Bold else FontWeight.Normal) }
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(facility.name, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
+                    }
                 }
-            }
+            )
+        }
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Column(Modifier.fillMaxSize()) {
+                
+                if (facility.fields.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Obiekt nie posiada żadnych boisk.", color = Color.Gray)
+                    }
+                    return@Column
+                }
 
-            Spacer(Modifier.height(8.dp))
+                // --- ZAKŁADKI BOISK ---
+                ScrollableTabRow(
+                    selectedTabIndex = uiState.selectedTabIndex,
+                    edgePadding = 16.dp,
+                    containerColor = Color.Transparent,
+                    contentColor = RacingGreen
+                ) {
+                    facility.fields.forEachIndexed { index, field ->
+                        Tab(
+                            selected = uiState.selectedTabIndex == index,
+                            onClick = { viewModel.onTabSelected(index) },
+                            text = { 
+                                Text(
+                                    field.name, 
+                                    fontWeight = if(uiState.selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                                ) 
+                            }
+                        )
+                    }
+                }
 
-            // --- WYBÓR DATY (Zależny od wybranego boiska) ---
-            val daysList = remember(selectedField.maxDaysAdvance) {
-                (0 until selectedField.maxDaysAdvance).map { today.plus(DatePeriod(days = it)) }
-            }
+                Spacer(Modifier.height(8.dp))
 
-            fun getPolishDayAbbr(day: DayOfWeek): String = when(day) { DayOfWeek.MONDAY -> "PON."; DayOfWeek.TUESDAY -> "WT."; DayOfWeek.WEDNESDAY -> "ŚR."; DayOfWeek.THURSDAY -> "CZW."; DayOfWeek.FRIDAY -> "PT."; DayOfWeek.SATURDAY -> "SOB."; DayOfWeek.SUNDAY -> "ND."; else -> day.name.take(3) }
-            fun getPolishMonthAbbr(month: Month): String = when(month) { Month.JANUARY -> "Sty"; Month.FEBRUARY -> "Lut"; Month.MARCH -> "Mar"; Month.APRIL -> "Kwi"; Month.MAY -> "Maj"; Month.JUNE -> "Cze"; Month.JULY -> "Lip"; Month.AUGUST -> "Sie"; Month.SEPTEMBER -> "Wrz"; Month.OCTOBER -> "Paź"; Month.NOVEMBER -> "Lis"; Month.DECEMBER -> "Gru"; else -> month.name.take(3) }
+                // --- WYBÓR DATY ---
+                val currentField = facility.fields.getOrNull(uiState.selectedTabIndex) ?: facility.fields.first()
+                val today = LocalDate(2026, 2, 16) // Mocked today
+                val daysList = remember(currentField.maxDaysAdvance) {
+                    (0 until currentField.maxDaysAdvance).map { today.plus(DatePeriod(days = it)) }
+                }
 
-            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(daysList.size) { index ->
-                    val date = daysList[index]
-                    val isSelected = (date == selectedDate)
-                    val contentColor = if (isSelected) RacingGreen else Color.Gray
-                    val circleColor = if (isSelected) RacingGreen else Color.Transparent
-                    val numberColor = if (isSelected) Color.White else Color.Black
-                    val borderColor = if (isSelected) RacingGreen else Color.LightGray
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(daysList) { date ->
+                        val isSelected = (date == uiState.selectedDate)
+                        val contentColor = if (isSelected) RacingGreen else Color.Gray
+                        val circleColor = if (isSelected) RacingGreen else Color.Transparent
+                        val numberColor = if (isSelected) Color.White else Color.Black
+                        val borderColor = if (isSelected) RacingGreen else Color.LightGray
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { selectedDate = date }.padding(4.dp)) {
-                        Text(getPolishDayAbbr(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
-                        Spacer(Modifier.height(8.dp))
-                        Surface(shape = CircleShape, color = circleColor, border = BorderStroke(1.dp, borderColor), modifier = Modifier.size(42.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(date.dayOfMonth.toString(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = numberColor)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable { viewModel.onDateSelected(date) }.padding(4.dp)
+                        ) {
+                            Text(getPolishDayAbbr(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = circleColor,
+                                border = BorderStroke(1.dp, borderColor),
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(date.dayOfMonth.toString(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = numberColor)
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(getPolishMonthAbbr(date.month), style = MaterialTheme.typography.labelSmall, color = contentColor)
+                        }
+                    }
+                }
+
+                // --- LISTA SLOTÓW CZASOWYCH ---
+                Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                    if (uiState.isLoading) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = RacingGreen)
+                        }
+                    } else {
+                        val startHour = 8
+                        val endHour = 22
+                        val slotsCount = (endHour - startHour) * 2
+                        
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            repeat(slotsCount) { index ->
+                                val hour = startHour + index / 2
+                                val minute = (index % 2) * 30
+                                val time = LocalTime(hour, minute)
+                                
+                                val isTaken = uiState.takenSlots.any { 
+                                    it.fieldId == currentField.id && it.startDate.contains(time.toString().substring(0, 5))
+                                }
+                                val isSelected = uiState.selectedSlots.contains(currentField.id to time)
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).height(56.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when {
+                                            isTaken -> Color.LightGray.copy(alpha = 0.5f)
+                                            isSelected -> RacingGreenLight.copy(alpha = 0.5f)
+                                            else -> Color.White
+                                        }
+                                    ),
+                                    onClick = { if (!isTaken) viewModel.onSlotToggled(currentField.id, time) },
+                                    border = if (isSelected) BorderStroke(2.dp, RacingGreen) else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                                ) {
+                                    Row(Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(time.toString().substring(0, 5), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                        Spacer(Modifier.width(16.dp))
+                                        Text(
+                                            text = if (isTaken) "Zajęte" else if (isSelected) "Wybrano" else "Dostępne",
+                                            color = if (isTaken) Color.Red else if (isSelected) RacingGreen else Color.DarkGray
+                                        )
+                                    }
+                                }
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(getPolishMonthAbbr(date.month), style = MaterialTheme.typography.labelSmall, color = contentColor)
                     }
                 }
-            }
-
-            // --- MIEJSCE NA NOWĄ OŚ CZASU ---
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
-                if (isLoading) {
-                    Box(Modifier.fillMaxSize().height(300.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = RacingGreen)
-                    }
-                } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                
+                // --- PASEK PODSUMOWANIA ---
+                if (uiState.selectedSlots.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shadowElevation = 8.dp,
+                        color = Color.White
                     ) {
-                        Column(Modifier.padding(32.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("TU ZBUDUJEMY NOWĄ OŚ CZASU", fontWeight = FontWeight.Bold, color = RacingGreen)
-                            Text("Dla boiska: ${selectedField.name}", color = Color.Gray)
-                            Text("Dla daty: $selectedDate", color = Color.Gray)
+                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            val totalPrice = calculateTotalPrice(uiState.selectedSlots, facility.fields)
+                            Column {
+                                Text("Wybrano: ${uiState.selectedSlots.size} slotów", style = MaterialTheme.typography.bodySmall)
+                                Text("${totalPrice} PLN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = RacingGreen)
+                            }
+                            Button(
+                                onClick = { viewModel.setShowPaymentDialog(true) },
+                                colors = ButtonDefaults.buttonColors(containerColor = RacingGreen),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("ZAREZERWUJ")
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // --- PASEK PODSUMOWANIA I PŁATNOŚCI (Na dole) ---
-        if (selectedSlots.isNotEmpty()) {
-            Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), shadowElevation = 16.dp, color = Color.White) {
-                Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    val totalPrice = calculateTotalPrice(selectedSlots, facility.fields)
-                    Column {
-                        Text("Wybrano: ${selectedSlots.size}", style = MaterialTheme.typography.bodyMedium)
-                        Text("$totalPrice PLN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = RacingGreen)
-                    }
-                    Button(onClick = { showPaymentDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = RacingGreen), shape = RoundedCornerShape(8.dp)) {
-                        Text("ZAREZERWUJ")
-                    }
-                }
+            // --- DIALOG PŁATNOŚCI ---
+            if (uiState.showPaymentDialog) {
+                val priceToPay = calculateTotalPrice(uiState.selectedSlots, facility.fields)
+                BlikPaymentDialog(
+                    totalPrice = priceToPay,
+                    onDismiss = { viewModel.setShowPaymentDialog(false) },
+                    onConfirmPayment = { viewModel.confirmPayment() }
+                )
             }
-        }
 
-        // --- DIALOG PŁATNOŚCI ---
-        if (showPaymentDialog) {
-            val priceToPay = calculateTotalPrice(selectedSlots, facility.fields)
-            BlikPaymentDialog(totalPrice = priceToPay, onDismiss = { showPaymentDialog = false }, onConfirmPayment = {
-                scope.launch {
-                    val requests = mergeSlotsToRequests(selectedSlots, facility.fields, selectedDate.toString())
-                    var successCount = 0
-                    var errorMsg: String? = null
-                    requests.forEach { req ->
-                        try { if (api.createBooking(userId, req)) successCount++ } catch (e: Exception) { errorMsg = e.message }
-                    }
-                    showPaymentDialog = false
-                    if (successCount > 0) {
-                        message = "Płatność przyjęta! Zarezerwowano pomyślnie."
-                        selectedSlots = emptySet()
-                        refreshTrigger++
-                    } else {
-                        message = "Błąd: $errorMsg"
-                    }
+            // --- KOMUNIKATY (SNACKBAR) ---
+            uiState.message?.let {
+                Snackbar(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp, start = 16.dp, end = 16.dp),
+                    action = { TextButton(onClick = { viewModel.clearMessage() }) { Text("OK") } }
+                ) {
+                    Text(it)
                 }
-            })
-        }
-
-        message?.let {
-            Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp, start = 16.dp, end = 16.dp), action = { TextButton(onClick = { message = null }) { Text("OK") } }) {
-                Text(it)
             }
         }
     }

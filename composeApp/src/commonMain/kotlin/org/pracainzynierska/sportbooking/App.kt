@@ -16,6 +16,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import org.pracainzynierska.sportbooking.theme.*
 import org.pracainzynierska.sportbooking.screens.*
+import org.koin.compose.KoinApplication
+import org.koin.compose.koinInject
 
 // --- DEFINICJA NAWIGACJI ---
 sealed class Screen {
@@ -35,13 +37,16 @@ sealed class Screen {
 @Composable
 @Preview
 fun App() {
-    MaterialTheme(colorScheme = AppColorScheme) {
+    KoinApplication(application = {
+        modules(sharedModule, appModule)
+    }) {
+        MaterialTheme(colorScheme = AppColorScheme) {
+            var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
+            val sessionManager: SessionManager = koinInject()
+            val currentUser = sessionManager.currentUser.value
+            val api: SportApi = koinInject()
 
-        var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
-        var currentUser by remember { mutableStateOf<AuthResponse?>(null) }
-        val api = remember { SportApi() }
-
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize()) {
 
                 // --- 1. NAGŁÓWEK (HEADER) ---
@@ -96,7 +101,7 @@ fun App() {
                                 }
 
                                 IconButton(onClick = {
-                                    currentUser = null
+                                    sessionManager.currentUser.value = null
                                     currentScreen = Screen.Login
                                 }) {
                                     Icon(Icons.Default.ExitToApp, "Wyloguj", tint = Color.Gray)
@@ -111,9 +116,8 @@ fun App() {
                     when (val screen = currentScreen) {
 
                         is Screen.Login -> LoginScreen(
-                            api = api,
                             onLoginSuccess = { user ->
-                                currentUser = user
+                                sessionManager.currentUser.value = user
                                 // Rozwidlenie po logowaniu!
                                 if (user.role == "FIELD_OWNER") {
                                     currentScreen = Screen.OwnerMain // Właściciel ląduje u siebie
@@ -125,46 +129,48 @@ fun App() {
                         )
 
                         is Screen.Register -> RegisterScreen(
-                            api = api,
                             onRegisterSuccess = { currentScreen = Screen.Login },
                             onNavigateToLogin = { currentScreen = Screen.Login }
                         )
 
                         is Screen.List -> FacilitiesScreen(
-                            api = api,
-                            currentUser = currentUser,
                             onNavigateToDetails = { facility -> currentScreen = Screen.Details(facility) }
                         )
 
                         is Screen.MyBookings -> {
-                            if (currentUser != null) MyBookingsScreen(api, currentUser!!.userId)
+                            if (currentUser != null) MyBookingsScreen()
                             else currentScreen = Screen.Login
                         }
 
                         is Screen.Details -> {
                             FacilityDetailsScreen(
                                 facility = screen.facility,
-                                currentUser = currentUser,
                                 onNavigateToScheduler = { currentScreen = Screen.Scheduler(screen.facility) },
                                 onBack = { currentScreen = Screen.List },
                             )
                         }
 
                         is Screen.Scheduler -> {
-                            if (currentUser != null) SchedulerScreen(screen.facility, api, currentUser!!.userId, { currentScreen = Screen.Details(screen.facility) })
+                            if (currentUser != null) SchedulerScreen(
+                                facility = screen.facility,
+                                onBack = { currentScreen = Screen.Details(screen.facility) }
+                            )
                             else currentScreen = Screen.Login
                         }
 
                         // Ten menedżer kalendarza na razie zostaje tu globalnie
                         is Screen.Manager -> {
-                            if (currentUser != null) FacilityManagerScreen(screen.facility, api, currentUser!!, { currentScreen = Screen.Details(screen.facility) })
+                            if (currentUser != null) FacilityManagerScreen(
+                                facility = screen.facility,
+                                onBack = { currentScreen = Screen.Details(screen.facility) }
+                            )
                             else currentScreen = Screen.Login
                         }
 
                         is Screen.Admin -> {
                             if (currentUser?.role == "ADMIN") {
                                 AdminPanelScreen(onLogout = {
-                                    currentUser = null
+                                    sessionManager.currentUser.value = null
                                     currentScreen = Screen.Login
                                 })
                             } else currentScreen = Screen.List
@@ -172,16 +178,14 @@ fun App() {
 
                         // Rejestrujemy naszą nową Skorupę
                         is Screen.OwnerMain -> {
-                            if (currentUser != null && currentUser!!.role == "FIELD_OWNER") {
-                                OwnerDashboardScreen( // <--- TUTAJ JEST GŁÓWNA NAPRAWA
-                                    api = api,
-                                    currentUser = currentUser!!,
+                            if (currentUser != null) {
+                                OwnerDashboardScreen(
                                     onLogout = {
-                                        currentUser = null
+                                        sessionManager.currentUser.value = null
                                         currentScreen = Screen.Login
                                     },
-                                    onNavigateToFacilityDetails = { facility ->
-                                        currentScreen = Screen.OwnerFacilityDetails(facility)
+                                    onNavigateToFacilityDetails = { selectedFacility ->
+                                        currentScreen = Screen.OwnerFacilityDetails(selectedFacility)
                                     }
                                 )
                             } else currentScreen = Screen.Login
@@ -192,15 +196,15 @@ fun App() {
                             if (currentUser != null) {
                                 FacilityDetailsOwnerScreen(
                                     facility = screen.facility,
-                                    currentUser = currentUser!!,
                                     onNavigateToManager = { currentScreen = Screen.Manager(screen.facility) },
                                     onBack = { currentScreen = Screen.OwnerMain } // Wróć do skorupy
                                 )
                             } else currentScreen = Screen.Login
                         }
-                    }
-                }
-            }
-        }
-    }
+                    } // when
+                } // Box
+            } // Column
+            } // Surface
+        } // MaterialTheme
+    } // KoinApplication
 }

@@ -21,12 +21,16 @@ import org.pracainzynierska.sportbooking.SportApi
 import org.pracainzynierska.sportbooking.components.AddFacilityDialog
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 
+import org.koin.compose.koinInject
+import org.pracainzynierska.sportbooking.SessionManager
+
 @Composable
 fun OwnerFacilitiesScreen(
-    api: SportApi,
-    currentUser: AuthResponse,
     onNavigateToManager: (FacilityDto) -> Unit // Przekazujemy dalej, żeby móc wejść w kalendarz
 ) {
+    val api: SportApi = koinInject()
+    val sessionManager: SessionManager = koinInject()
+    val currentUser = sessionManager.currentUser.value!!
     var myFacilities by remember { mutableStateOf<List<FacilityDto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -147,7 +151,6 @@ fun OwnerFacilitiesScreen(
                 // ŁADUJEMY TWÓJ GŁÓWNY PANEL ZARZĄDZANIA!
                 FacilityDetailsOwnerScreen(
                     facility = selectedFacility!!,
-                    currentUser = currentUser,
                     onNavigateToManager = { onNavigateToManager(selectedFacility!!) },
                     onBack = { /* Ponieważ jesteśmy płascy, przycisk Back wewnątrz detali można będzie docelowo usunąć lub zignorować */ }
                 )

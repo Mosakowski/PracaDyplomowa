@@ -18,33 +18,25 @@ import org.pracainzynierska.sportbooking.components.BookingCard
 import org.pracainzynierska.sportbooking.theme.ErrorRed
 import org.pracainzynierska.sportbooking.theme.RacingGreen
 
+import org.koin.compose.koinInject
+
+import org.pracainzynierska.sportbooking.viewmodels.MyBookingsViewModel
+import org.koin.compose.viewmodel.koinViewModel
+
 @Composable
-fun MyBookingsScreen(api: SportApi, userId: Int) {
-    var bookings by remember { mutableStateOf<List<BookingDto>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var bookingToCancel by remember { mutableStateOf<BookingDto?>(null) }
-    val scope = rememberCoroutineScope()
-
-    fun refresh() {
-        scope.launch {
-            try {
-                isLoading = true
-                val fetched = api.getMyBookings(userId)
-                bookings = fetched.sortedByDescending { it.id }
-            } catch (e: Exception) { println(e) } finally { isLoading = false }
-        }
-    }
-
-    LaunchedEffect(Unit) { refresh() }
+fun MyBookingsScreen(
+    viewModel: MyBookingsViewModel = koinViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Text("Twoja historia", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
 
-            if (isLoading) {
+            if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = RacingGreen) }
-            } else if (bookings.isEmpty()) {
+            } else if (uiState.bookings.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.EventBusy, null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
@@ -53,30 +45,26 @@ fun MyBookingsScreen(api: SportApi, userId: Int) {
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(bookings.size) { index ->
-                        BookingCard(bookings[index], onCancel = { bookingToCancel = bookings[index] })
+                    items(uiState.bookings.size) { index ->
+                        BookingCard(uiState.bookings[index], onCancel = { viewModel.showCancelConfirmation(uiState.bookings[index]) })
                     }
                 }
             }
         }
 
-        if (bookingToCancel != null) {
+        if (uiState.bookingToCancel != null) {
             AlertDialog(
-                onDismissRequest = { bookingToCancel = null },
+                onDismissRequest = { viewModel.hideCancelConfirmation() },
                 title = { Text("Odwołać rezerwację?") },
-                text = { Text("Czy na pewno chcesz zrezygnować z rezerwacji na boisku \"${bookingToCancel?.fieldName}\"?") },
+                text = { Text("Czy na pewno chcesz zrezygnować z rezerwacji na boisku \"${uiState.bookingToCancel?.fieldName}\"?") },
                 confirmButton = {
                     Button(
-                        onClick = {
-                            scope.launch {
-                                if (api.cancelBooking(userId, bookingToCancel!!.id)) refresh()
-                                bookingToCancel = null
-                            }
-                        }, colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                        onClick = { viewModel.cancelBooking() }, 
+                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
                     ) { Text("Tak, odwołaj") }
                 },
-                dismissButton = { TextButton(onClick = { bookingToCancel = null }) { Text("Nie, zostaw") } }
+                dismissButton = { TextButton(onClick = { viewModel.hideCancelConfirmation() }) { Text("Nie, zostaw") } }
             )
         }
     }
-}
+}
